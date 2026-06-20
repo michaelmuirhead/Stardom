@@ -6,6 +6,7 @@ import { DIFFICULTIES, GENRE_KEYS } from '../js/data.js';
 import {
   advanceWeek, audition, auditionChance, takeClass, network, rest, sideJob,
   extraWork, toggleAgent, writeScript, startProduction, isBusy, catchUp, quitSeries,
+  agentReady,
 } from '../js/engine.js';
 
 let failures = 0;
@@ -103,6 +104,32 @@ function exerciseEarly() {
   return { callbacks, auditioned, preAgentBoardOk, hasAgent: s.hasAgent };
 }
 
+// A long, competent career to observe awards-season outcomes.
+function exerciseAwards(years) {
+  const s = newGame('Laureate', 'normal');
+  for (let i = 0; i < years * 52 && !s.gameOver; i++) {
+    if (!s.hasAgent && agentReady(s).met) toggleAgent(s);
+    if (s.energy < 22) { rest(s); advanceWeek(s); continue; }
+    if (!isBusy(s) && s.offers.length) {
+      const cb = s.offers.find((o) => o.callback);
+      const t = cb || [...s.offers].sort((a, b) => auditionChance(s, b) * b.pay - auditionChance(s, a) * a.pay)[0];
+      if (s.money < 1000) sideJob(s);
+      else if (t && auditionChance(s, t) > 0.25) audition(s, t.id);
+      else if (s.money > 1500 && s.energy >= 25) takeClass(s, 'acting');
+      else extraWork(s);
+    } else if (s.money < 600) { sideJob(s); }
+    else if (s.money > 1500 && s.energy >= 25 && Math.random() < 0.4) { takeClass(s, 'acting'); }
+    else if (!isBusy(s)) { network(s); } else { rest(s); }
+    if (s.fame >= 15 && s.money > 1500 && s.energy >= 30 && Math.random() < 0.05) takeClass(s, 'directing');
+    if (s.fame >= 25 && s.money > 2000 && s.energy >= 30 && Math.random() < 0.05) takeClass(s, 'producing');
+    if (s.producing >= 5 && s.money > 35000 && !s.productions.length) {
+      startProduction(s, { budgetKey: 'mid', scriptId: '', direct: s.directing >= 5 });
+    }
+    advanceWeek(s);
+  }
+  return { wins: s.stats.wins || 0, noms: s.stats.noms || 0, years, fame: s.fame };
+}
+
 console.log('Stardom engine smoke test\n');
 
 // 1) Difficulty config sanity
@@ -142,6 +169,13 @@ const early = exerciseEarly();
 console.log(`  early burst: ${early.auditioned} auditions, ${early.callbacks} callbacks`);
 assert(early.callbacks > 0, 'audition callbacks occurred in early-game burst');
 assert(early.preAgentBoardOk, 'pre-agent board only shows open-call roles');
+
+// 5) Awards season fires and produces realistic (non-runaway) outcomes
+const YEARS = 15;
+const aw = exerciseAwards(YEARS);
+console.log(`  awards (${YEARS}yr legend): ${aw.wins} wins, ${aw.noms} nominations`);
+assert(aw.wins + aw.noms > 0, 'awards season produced nominations/wins over a long career');
+assert(aw.wins < YEARS, `award wins are realistic, not runaway (${aw.wins} over ${YEARS}yr)`);
 
 console.log('');
 if (failures) {

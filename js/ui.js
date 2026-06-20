@@ -1,5 +1,5 @@
 // ui.js — rendering & event wiring
-import { CLASSES, GENRES, GENRE_KEYS, fameTier, AWARD_NAME } from './data.js';
+import { CLASSES, GENRES, GENRE_KEYS, CEREMONIES, fameTier } from './data.js';
 import {
   audition, auditionChance, takeClass, network, rest, sideJob, extraWork, toggleAgent,
   writeScript, sellScript, startProduction, estimateProduction, advanceWeek, isBusy, BUDGET_TIERS,
@@ -407,6 +407,8 @@ function careerView() {
 
   const meta = el('div', 'meta-row');
   meta.innerHTML = `<span>Agent: ${S.hasAgent ? '✅ Signed' : '— None'}</span>
+    <span>💵 Net worth: ${money(S.money)}</span>
+    <span>🏅 Career prestige: ${Math.round(S.careerPrestige || 0)}</span>
     <span>Auditions: ${S.stats.auditions}</span>
     <span>Roles landed: ${S.stats.landed}</span>
     <span>Extra gigs: ${S.stats.extra || 0}</span>
@@ -415,14 +417,7 @@ function careerView() {
     <span>Classes: ${S.stats.classes}</span>`;
   wrap.appendChild(meta);
 
-  // Awards
-  wrap.appendChild(el('h3', null, `🏆 ${AWARD_NAME} Awards (${S.awards.length})`));
-  if (!S.awards.length) wrap.appendChild(el('p', 'muted', 'No wins yet. Do prestigious work to earn nominations at year\'s end.'));
-  else {
-    const ul = el('ul', 'list');
-    for (const a of S.awards) ul.appendChild(el('li', null, `🏆 ${a.name} (Yr ${a.year}) — ${a.project}`));
-    wrap.appendChild(ul);
-  }
+  wrap.appendChild(awardsSection());
 
   // Filmography
   wrap.appendChild(el('h3', null, `🎞️ Filmography (${S.filmography.length})`));
@@ -437,12 +432,53 @@ function careerView() {
   return wrap;
 }
 
+// ---- Awards & nominations --------------------------------------------------
+function awardsSection() {
+  const wrap = el('div');
+  const wins = S.awards.filter((a) => a.won);
+  const noms = S.awards.filter((a) => !a.won);
+  wrap.appendChild(el('h3', null, `🏆 Awards — ${wins.length} win${wins.length === 1 ? '' : 's'}, ${noms.length} nomination${noms.length === 1 ? '' : 's'}`));
+
+  if (!S.awards.length) {
+    wrap.appendChild(el('p', 'muted', 'No nominations yet. Awards go to prestigious work — strong films, acclaimed TV, and projects you direct or produce. Commercials don\'t count.'));
+    const cal = el('div', 'awards-cal');
+    for (const c of CEREMONIES) {
+      cal.appendChild(el('div', 'cal-chip', `${c.icon} ${c.name} <span class="muted">· wk ${c.week}</span>`));
+    }
+    wrap.appendChild(cal);
+    return wrap;
+  }
+
+  // Group by ceremony, in calendar order.
+  for (const cer of CEREMONIES) {
+    const mine = S.awards.filter((a) => a.ceremonyKey === cer.key);
+    if (!mine.length) continue;
+    const w = mine.filter((a) => a.won).length;
+    wrap.appendChild(el('h4', 'award-head', `${cer.icon} ${cer.name} <span class="muted">— ${w} win${w === 1 ? '' : 's'} / ${mine.length} nom${mine.length === 1 ? '' : 's'}</span>`));
+    const ul = el('ul', 'list');
+    for (const a of [...mine].reverse()) {
+      ul.appendChild(el('li', a.won ? 'award-win' : '',
+        `${a.won ? '🥇' : '🎗️'} <b>${a.category}</b> — ${a.project} <span class="muted">(Yr ${a.year})</span>`));
+    }
+    wrap.appendChild(ul);
+  }
+  // Any legacy awards from older saves (pre-ceremony format).
+  const legacy = S.awards.filter((a) => !a.ceremonyKey);
+  if (legacy.length) {
+    const ul = el('ul', 'list');
+    for (const a of legacy) ul.appendChild(el('li', null, `🏆 ${a.name || a.category || 'Award'} <span class="muted">(Yr ${a.year})</span> — ${a.project || ''}`));
+    wrap.appendChild(ul);
+  }
+  return wrap;
+}
+
 // ---- Game over -------------------------------------------------------------
 function gameOverView() {
   const v = el('div', 'view gameover');
   v.appendChild(el('h2', null, '💀 Game Over'));
   v.appendChild(el('p', null, `${S.name}'s acting career has come to an end after ${S.year} year(s).`));
-  v.appendChild(el('p', 'muted', `Peak fame: ${S.fame.toFixed(0)} (${fameTier(S.fame)}) · ${S.filmography.length} credits · ${S.awards.length} ${AWARD_NAME} award(s).`));
+  const wins = S.awards.filter((a) => a.won).length;
+  v.appendChild(el('p', 'muted', `Peak fame: ${S.fame.toFixed(0)} (${fameTier(S.fame)}) · ${S.filmography.length} credits · ${wins} award win(s).`));
   const btn = actionBtn('🔄 Start a new career', () => { if (window.__stardomNewGame) window.__stardomNewGame(); });
   v.appendChild(btn);
   return v;

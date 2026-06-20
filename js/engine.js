@@ -1,7 +1,7 @@
 // engine.js — core game mechanics
 import {
   WEEKS_PER_YEAR, AGENT_CUT, CLASSES, EVENTS,
-  AWARD_NAME, DIFFICULTIES, GENRES, GENRE_KEYS,
+  DIFFICULTIES, GENRES, GENRE_KEYS, CEREMONIES, creditMedium,
   projectTitle, makeRole, makeCostar,
 } from './data.js';
 import { pushLog, refreshOffers } from './state.js';
@@ -195,10 +195,10 @@ function startSeries(s, role, costars) {
 export function quitSeries(s) {
   if (!s.activeSeries) return { ok: false, msg: 'You\'re not on a series.' };
   const sh = s.activeSeries;
-  s.filmography.push({
+  addCredit(s, {
     title: `${sh.title} (${sh.season} season${sh.season > 1 ? 's' : ''})`,
-    category: 'TV Series', year: s.year, role: sh.part,
-    quality: Math.round(sh.ratings || 50),
+    category: 'TV Series', role: sh.part, genre: sh.genreName,
+    lead: /lead/i.test(sh.part), quality: Math.round(sh.ratings || 50),
   });
   pushLog(s, `🚪 You left "${sh.title}" after ${sh.season} season(s) to pursue other work.`);
   s.activeSeries = null;
@@ -215,7 +215,7 @@ function endSeason(s) {
   gainFame(s, fg);
   s.acting = clamp(+(s.acting + sg).toFixed(1), 0, 100);
   s.reputation = clamp(s.reputation + sh.prestige, 0, 100);
-  s.yearPrestige += sh.prestige;
+  s.careerPrestige += sh.prestige;
   awardGenreXp(s, sh.genre, 2 + sh.prestige);
   const starPower = bondWithCostars(s, sh.costars);
 
@@ -237,12 +237,12 @@ function endSeason(s) {
   } else {
     // Cancellation: a long run earns a prestigious finale.
     const finale = +(sh.prestige * Math.min(sh.season, 6) * 0.6).toFixed(2);
-    s.yearPrestige += finale;
+    s.careerPrestige += finale;
     s.reputation = clamp(s.reputation + finale, 0, 100);
-    s.filmography.push({
+    addCredit(s, {
       title: `${sh.title} (${sh.season} season${sh.season > 1 ? 's' : ''})`,
-      category: 'TV Series', year: s.year, role: sh.part,
-      quality: sh.ratings,
+      category: 'TV Series', role: sh.part, genre: sh.genreName,
+      lead: /lead/i.test(sh.part), quality: sh.ratings,
     });
     pushLog(s, `📉 "${sh.title}" was CANCELLED after ${sh.season} season(s) (${sh.ratings} rating). A ${sh.season >= 3 ? 'beloved' : 'brief'} run wraps. +${fg} fame.`);
     s.activeSeries = null;
@@ -498,15 +498,16 @@ function wrapProduction(s, prod) {
   const fameGain = +(q / 100 * 6 * Math.sqrt(prod.scale)).toFixed(1);
   gainFame(s, fameGain);
   const prestige = +(q / 100 * (prod.directed ? 2 : 1.2) * Math.sqrt(prod.scale)).toFixed(2);
-  s.yearPrestige += prestige;
+  s.careerPrestige += prestige;
   s.reputation = clamp(s.reputation + q / 25, 0, 100);
   if (prod.directed) s.directing = clamp(+(s.directing + 1).toFixed(1), 0, 100);
   s.producing = clamp(+(s.producing + 1).toFixed(1), 0, 100);
   awardGenreXp(s, prod.genre, 1 + prestige);
 
-  s.filmography.push({
-    title: prod.title, category: 'Produced', year: s.year, genre: prod.genreName,
-    role: prod.directed ? 'Producer / Director' : 'Producer', quality: Math.round(q),
+  addCredit(s, {
+    title: prod.title, category: 'Produced', genre: prod.genreName,
+    role: prod.directed ? 'Producer / Director' : 'Producer',
+    produced: true, directed: prod.directed, quality: Math.round(q),
   });
 
   const verdict = profit > 0
@@ -537,26 +538,85 @@ function applyDelta(s, d) {
   if (d.energyPenalty) s.energyPenalty = (s.energyPenalty || 0) + d.energyPenalty;
 }
 
-// ---- Award season ----------------------------------------------------------
-function awardSeason(s) {
-  // Probability of a nomination scales with prestige earned this year.
-  const p = clamp(s.yearPrestige / 12, 0, 0.9);
-  if (s.yearPrestige > 1.5 && Math.random() < p) {
-    const nominated = true;
-    const won = Math.random() < clamp(s.yearPrestige / 25, 0.1, 0.8);
-    if (won) {
-      const recent = s.filmography[s.filmography.length - 1];
-      const award = { name: AWARD_NAME, year: s.year, project: recent ? recent.title : 'your work' };
-      s.awards.push(award);
-      gainFame(s, 8);
-      s.reputation = clamp(s.reputation + 12, 0, 100);
-      pushLog(s, `🏆 You WON the ${AWARD_NAME} for ${award.project}! Your career soars. +8 fame.`);
+// ---- Filmography credits ---------------------------------------------------
+function absWeek(s) { return (s.year - 1) * WEEKS_PER_YEAR + s.week; }
+
+// Record a completed credit, stamping awards-eligibility metadata.
+function addCredit(s, c) {
+  s.filmography.push({
+    year: s.year,
+    wk: absWeek(s),
+    medium: creditMedium(c.category),
+    lead: !!c.lead,
+    produced: !!c.produced,
+    directed: !!c.directed,
+    ...c,
+  });
+}
+
+// ---- Awards season ---------------------------------------------------------
+// Is a credit eligible for a given category?
+function eligibleFor(c, cat) {
+  if (cat.kind === 'acting') {
+    if (c.produced) return false;                 // performances only
+    if (c.medium !== cat.medium) return false;
+    if (cat.lead != null && !!c.lead !== cat.lead) return false;
+    return true;
+  }
+  if (cat.kind === 'directing') return !!c.directed && c.medium === 'film';
+  if (cat.kind === 'producing') return !!c.produced && c.medium === 'film';
+  return false;
+}
+
+// Judge one category. Realism over a whole career: a nomination is a selective
+// honor (your work must clear an absolute industry bar, higher at more
+// prestigious ceremonies), and even when nominated you're one of ~5 — winning is
+// roughly a 1-in-5 draw, tilted only modestly by how exceptional the work is.
+function judgeCategory(s, credit, cat, cer) {
+  const craft = cat.kind === 'directing' ? s.directing
+    : cat.kind === 'producing' ? s.producing : s.acting;
+  // Campaign strength ~0..100: work quality dominates, with craft, reputation
+  // (industry respect/campaigning) and fame contributing.
+  const strength = (credit.quality ?? 40) * 0.55 + craft * 0.25 + s.reputation * 0.12 + s.fame * 0.08;
+
+  // Nomination bar climbs with the ceremony's prestige (Oscars hardest).
+  const bar = 60 + cer.prestige * 11;
+  const nomChance = clamp((strength - bar) / 40, 0, 0.7);
+  if (Math.random() >= nomChance) return { nominated: false, won: false };
+
+  // Among five nominees, the best work is favored but upsets are common.
+  const edge = clamp((strength - bar) / 65, 0, 0.32);
+  const winChance = clamp(0.14 + edge, 0.07, 0.46);
+  return { nominated: true, won: Math.random() < winChance };
+}
+
+function runCeremony(s, cer) {
+  const now = absWeek(s);
+  const eligible = s.filmography.filter((c) => c.wk != null && c.wk > now - WEEKS_PER_YEAR && c.wk <= now);
+  for (const cat of cer.categories) {
+    const pool = eligible.filter((c) => eligibleFor(c, cat));
+    if (!pool.length) continue;
+    // Your best eligible credit is submitted for this category.
+    const mine = pool.reduce((a, b) => ((b.quality ?? 0) > (a.quality ?? 0) ? b : a));
+    const res = judgeCategory(s, mine, cat, cer);
+    if (!res.nominated) continue;
+
+    s.awards.push({
+      ceremony: cer.name, ceremonyKey: cer.key, icon: cer.icon,
+      category: cat.name, project: mine.title, year: s.year, won: res.won,
+    });
+    if (res.won) {
+      s.stats.wins = (s.stats.wins || 0) + 1;
+      gainFame(s, 4 * cer.prestige);
+      s.reputation = clamp(s.reputation + 6 * cer.prestige, 0, 100);
+      pushLog(s, `🥇 WON ${cat.name} at the ${cer.name} for "${mine.title}"!`);
     } else {
-      gainFame(s, 3);
-      pushLog(s, `🎟️ You were nominated for a ${AWARD_NAME} but didn't win. Still, exposure! +3 fame.`);
+      s.stats.noms = (s.stats.noms || 0) + 1;
+      gainFame(s, 1.5 * cer.prestige);
+      s.reputation = clamp(s.reputation + 2 * cer.prestige, 0, 100);
+      pushLog(s, `🎗️ Nominated for ${cat.name} at the ${cer.name} ("${mine.title}").`);
     }
   }
-  s.yearPrestige = 0;
 }
 
 // ---- Advance one week ------------------------------------------------------
@@ -583,11 +643,12 @@ export function advanceWeek(s) {
       gainFame(s, fameGain);
       s.acting = clamp(+(s.acting + a.role.skillGain).toFixed(1), 0, 100);
       s.reputation = clamp(s.reputation + a.role.prestige * 2, 0, 100);
-      s.yearPrestige += a.role.prestige;
+      s.careerPrestige += a.role.prestige;
       awardGenreXp(s, a.role.genre, 1.5 + a.role.prestige);
-      s.filmography.push({
-        title: a.role.title, category: a.role.catName, year: s.year,
+      addCredit(s, {
+        title: a.role.title, category: a.role.catName,
         role: a.role.part, genre: a.role.genreName,
+        lead: /lead/i.test(a.role.part),
         quality: Math.round(50 + a.role.prestige * 10),
       });
       const rubMsg = rubOff > 0 ? ` (+${rubOff} from famous co-stars)` : '';
@@ -631,8 +692,12 @@ export function advanceWeek(s) {
     s.week = 1;
     s.year++;
     s.age++;
-    awardSeason(s);
     pushLog(s, `📅 A new year begins. You are now ${s.age}.`);
+  }
+
+  // Awards season: ceremonies fall on specific weeks through the year.
+  for (const cer of CEREMONIES) {
+    if (s.week === cer.week) runCeremony(s, cer);
   }
 
   // Lose condition: deep, sustained debt

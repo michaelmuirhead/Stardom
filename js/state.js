@@ -26,8 +26,8 @@ export function newGame(playerName, difficultyKey) {
     contacts: [],        // co-stars & industry relationships
     partner: null,       // current romantic partner (contact id)
 
-    yearPrestige: 0,     // prestige accumulated this year (for award season)
-    stats: { auditions: 0, landed: 0, classes: 0, seasons: 0 },
+    careerPrestige: 0,   // cumulative prestige across your whole career
+    stats: { auditions: 0, landed: 0, classes: 0, seasons: 0, wins: 0, noms: 0 },
     gameOver: false,
     log: [],
   };

@@ -89,8 +89,24 @@ and producing (which unlock as your fame grows).
   on script quality, your producing skill, and—if you also **direct**—your
   directing skill. Each production also builds your affinity in its genre.
 
-**Award season** happens at the end of each year. Prestigious work earns
-nominations and possibly a **Golden Star**, rocketing your fame and reputation.
+**Awards season** runs through the calendar with four real ceremonies, each
+judging your eligible credits from the trailing year:
+
+| Ceremony | When | Honors |
+|----------|------|--------|
+| 🌐 Golden Globe Awards | early | Best Actor — Film & TV |
+| 🎟️ SAG Awards | late winter | Outstanding Performance — Film & TV |
+| 🏆 Academy Awards | spring | Best Actor, Supporting, Director, Picture |
+| 📺 Emmy Awards | fall | Outstanding Lead & Supporting Actor (TV) |
+
+Only prestigious work qualifies — strong films, acclaimed TV, and projects you
+direct or produce; commercials never count. A **nomination** is selective (your
+work must clear an absolute industry bar that's higher at the more prestigious
+ceremonies), and even when nominated you're one of five — **winning is roughly a
+1-in-5 draw**, tilted only modestly by how exceptional the work is. Expect a
+handful of wins across a great career, and an Academy Award to mean something.
+Wins and nominations both boost fame and reputation and are recorded on your
+**Career** page, grouped by ceremony.
 
 **Watch the money.** Weekly living costs never stop. Go broke and your career
 ends — work side jobs to stay afloat between gigs.

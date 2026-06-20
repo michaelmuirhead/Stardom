@@ -191,6 +191,15 @@ main {
 .est-row.good span:last-child { color: var(--good); font-weight: 700; }
 .est-row.bad span:last-child { color: var(--bad); font-weight: 700; }
 
+/* Awards */
+.award-head { margin: 16px 0 6px; font-size: 14px; }
+.award-win { border-color: var(--gold) !important; background: #221c10; }
+.awards-cal { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.cal-chip {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 999px; padding: 5px 12px; font-size: 13px;
+}
+
 .qchip {
   font-size: 11px; font-weight: 700; color: var(--gold2);
   background: #2a2718; border: 1px solid var(--line); border-radius: 999px; padding: 1px 7px;

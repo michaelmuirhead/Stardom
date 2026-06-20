@@ -227,4 +227,46 @@ export function fameTier(fame) {
   return t.label;
 }
 
-export const AWARD_NAME = 'Golden Star';
+// ---- Awards season ---------------------------------------------------------
+// Real-world ceremonies, each held at a point in the year and judging your
+// eligible credits from the trailing ~12 months. `kind` selects which work &
+// skill a category evaluates; `medium` and `lead` filter eligible credits.
+export const CEREMONIES = [
+  {
+    key: 'globes', name: 'Golden Globe Awards', icon: '🌐', week: 3, prestige: 1.0,
+    categories: [
+      { key: 'gg_film', name: 'Best Actor — Motion Picture', kind: 'acting', medium: 'film', lead: true },
+      { key: 'gg_tv', name: 'Best Actor — Television', kind: 'acting', medium: 'tv', lead: true },
+    ],
+  },
+  {
+    key: 'sag', name: 'Screen Actors Guild Awards', icon: '🎟️', week: 6, prestige: 1.05,
+    categories: [
+      { key: 'sag_film', name: 'Outstanding Performance — Film', kind: 'acting', medium: 'film' },
+      { key: 'sag_tv', name: 'Outstanding Performance — Television', kind: 'acting', medium: 'tv' },
+    ],
+  },
+  {
+    key: 'oscars', name: 'Academy Awards', icon: '🏆', week: 11, prestige: 1.6,
+    categories: [
+      { key: 'osc_actor', name: 'Best Actor', kind: 'acting', medium: 'film', lead: true },
+      { key: 'osc_supp', name: 'Best Supporting Actor', kind: 'acting', medium: 'film', lead: false },
+      { key: 'osc_dir', name: 'Best Director', kind: 'directing', medium: 'film' },
+      { key: 'osc_pic', name: 'Best Picture', kind: 'producing', medium: 'film' },
+    ],
+  },
+  {
+    key: 'emmys', name: 'Emmy Awards', icon: '📺', week: 38, prestige: 1.25,
+    categories: [
+      { key: 'emmy_lead', name: 'Outstanding Lead Actor', kind: 'acting', medium: 'tv', lead: true },
+      { key: 'emmy_supp', name: 'Outstanding Supporting Actor', kind: 'acting', medium: 'tv', lead: false },
+    ],
+  },
+];
+
+// Map a filmography credit's category label to an awards medium.
+export function creditMedium(category) {
+  if (category === 'Indie Film' || category === 'Studio Film' || category === 'Produced') return 'film';
+  if (category === 'TV Series' || category === 'TV Movie') return 'tv';
+  return 'other'; // commercials etc. are not awards-eligible
+}
