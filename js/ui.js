@@ -1,7 +1,7 @@
 // ui.js — rendering & event wiring
 import { CLASSES, GENRES, GENRE_KEYS, fameTier, AWARD_NAME } from './data.js';
 import {
-  audition, auditionChance, takeClass, network, rest, sideJob, toggleAgent,
+  audition, auditionChance, takeClass, network, rest, sideJob, extraWork, toggleAgent,
   writeScript, sellScript, startProduction, advanceWeek, isBusy, BUDGET_TIERS,
   catchUp, quitSeries, specialty, diffOf,
 } from './engine.js';
@@ -137,9 +137,10 @@ function auditionsView() {
   const wrap = el('div', 'view');
   // Quick actions
   const quick = el('div', 'quick');
+  quick.appendChild(actionBtn('🎬 Extra work (+$, +craft)', () => act(extraWork(S)), isBusy(S) || S.energy < 14));
+  quick.appendChild(actionBtn('🍽️ Side job (+$)', () => act(sideJob(S)), S.energy < 20));
   quick.appendChild(actionBtn('😴 Rest (+energy)', () => act(rest(S))));
   quick.appendChild(actionBtn('🥂 Network (+rep)', () => act(network(S)), S.energy < 15));
-  quick.appendChild(actionBtn('🍽️ Side job (+$)', () => act(sideJob(S)), S.energy < 20));
   quick.appendChild(actionBtn(
     S.hasAgent ? '👋 Drop agent' : '🕴️ Get agent',
     () => act(toggleAgent(S)),
@@ -153,7 +154,7 @@ function auditionsView() {
     return wrap;
   }
   if (!S.offers.length) {
-    wrap.appendChild(el('p', 'muted', 'No auditions available. Network or advance the week for new listings.'));
+    wrap.appendChild(el('p', 'muted', 'No auditions on the board. Take extra work to keep the lights on and build craft, network for new leads, or advance the week.'));
     return wrap;
   }
   const grid = el('div', 'grid');
@@ -165,8 +166,9 @@ function auditionsView() {
 function roleCard(r) {
   const chance = Math.round(auditionChance(S, r) * 100);
   const chCls = chance >= 60 ? 'good' : chance >= 30 ? 'mid' : 'bad';
-  const c = el('div', 'card');
+  const c = el('div', 'card' + (r.callback ? ' callback' : ''));
   c.innerHTML = `
+    ${r.callback ? '<div class="badge">📞 Callback — they liked you</div>' : ''}
     <div class="card-head"><span class="card-ic">${r.icon}</span>
       <div><div class="card-title">${r.title}</div>
       <div class="muted small">${r.genreIcon} ${r.genreName} ${r.catName} · ${r.part}</div></div></div>
@@ -181,7 +183,8 @@ function roleCard(r) {
       <span>Needs fame ${r.fameReq}</span>
     </div>
     <div class="chance ${chCls}">Audition odds: ${chance}%</div>`;
-  const btn = actionBtn('🎟️ Audition (18⚡)', () => act(audition(S, r.id)), S.energy < 18);
+  const btn = actionBtn(r.callback ? '🎟️ Callback audition (18⚡)' : '🎟️ Audition (18⚡)',
+    () => act(audition(S, r.id)), S.energy < 18);
   c.appendChild(btn);
   return c;
 }
@@ -372,6 +375,7 @@ function careerView() {
   meta.innerHTML = `<span>Agent: ${S.hasAgent ? '✅ Signed' : '— None'}</span>
     <span>Auditions: ${S.stats.auditions}</span>
     <span>Roles landed: ${S.stats.landed}</span>
+    <span>Extra gigs: ${S.stats.extra || 0}</span>
     <span>TV seasons: ${S.stats.seasons || 0}</span>
     <span>Contacts: ${S.contacts.length}</span>
     <span>Classes: ${S.stats.classes}</span>`;

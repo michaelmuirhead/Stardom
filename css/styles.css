@@ -140,6 +140,12 @@ main {
 .card-title { font-weight: 700; }
 .reqs { display: flex; gap: 12px; flex-wrap: wrap; }
 .reqs span { white-space: nowrap; }
+.card.callback { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; }
+.badge {
+  align-self: flex-start; font-size: 11px; font-weight: 700;
+  background: #2a2718; color: var(--gold2); border: 1px solid var(--gold);
+  border-radius: 999px; padding: 2px 10px;
+}
 .chance { font-weight: 700; font-size: 13px; }
 .chance.good { color: var(--good); }
 .chance.mid { color: var(--mid); }

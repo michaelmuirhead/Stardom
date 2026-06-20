@@ -57,6 +57,8 @@ export function auditionChance(s, role) {
   chance += connectionBonus(s);
   // Specialization: experience in this genre makes you a natural fit.
   chance += clamp(genreAffinity(s, role.genre) / 250, 0, 0.2);
+  // A callback means they already liked you — better shot the second time.
+  if (role.callback) chance += 0.18;
   return clamp(chance, 0.03, 0.97);
 }
 
@@ -71,12 +73,16 @@ export function audition(s, roleId) {
   spendEnergy(s, energyCost);
   s.stats.auditions++;
   const chance = auditionChance(s, role);
-  const won = Math.random() < chance;
+  const roll = Math.random();
+  const won = roll < chance;
 
-  // Remove this offer either way (you used your shot).
-  s.offers = s.offers.filter((r) => r.id !== roleId);
+  // You always learn from being in the room — even when you don't book it.
+  const learn = +rf(0.15, 0.5).toFixed(2);
+  s.acting = clamp(+(s.acting + learn).toFixed(1), 0, 100);
+  awardGenreXp(s, role.genre, 0.4);
 
   if (won) {
+    s.offers = s.offers.filter((r) => r.id !== roleId);
     s.stats.landed++;
     const costars = castCostars(s);
     const names = costars.map((c) => c.name).join(' & ');
@@ -89,7 +95,18 @@ export function audition(s, roleId) {
     pushLog(s, `✅ You landed ${role.part} in "${role.title}" (${role.genreName} ${role.catName}) with ${names}! Filming starts now.`);
     return { ok: true, won: true, msg: `You got the part in "${role.title}"!` };
   }
-  pushLog(s, `❌ You auditioned for "${role.title}" but didn't get it. (${Math.round(chance * 100)}% odds)`);
+
+  // Near-miss → callback: the offer stays, with better odds next time.
+  const margin = roll - chance; // how far you missed (smaller = closer)
+  if (!role.callback && margin < 0.15) {
+    role.callback = true;
+    pushLog(s, `📞 Callback! "${role.title}" wants to see you again — your odds improve. (+${learn} acting from the room)`);
+    return { ok: true, won: false, callback: true, msg: `Callback for "${role.title}"!` };
+  }
+
+  // Otherwise you've used your shot.
+  s.offers = s.offers.filter((r) => r.id !== roleId);
+  pushLog(s, `❌ You auditioned for "${role.title}" but didn't get it. (${Math.round(chance * 100)}% odds, +${learn} acting)`);
   return { ok: true, won: false, msg: `No luck on "${role.title}".` };
 }
 
@@ -281,6 +298,38 @@ export function sideJob(s) {
   s.money += pay;
   pushLog(s, `🍽️ Worked a serving shift. +$${pay}.`);
   return { ok: true, msg: `Earned $${pay}.` };
+}
+
+// Background/extra work: the always-available on-theme floor gig. It roughly
+// keeps the lights on (a profit on Easy, a slow bleed on Normal, brutal on Hard)
+// while building a little craft — enough to survive on, never enough to escape.
+const EXTRA_PAY = 200;
+const EXTRA_ENERGY = 14;
+export function extraWork(s) {
+  if (s.gameOver) return { ok: false, msg: 'The game is over.' };
+  if (isBusy(s)) return { ok: false, msg: 'You can\'t do extra work while on a project.' };
+  if (s.energy < EXTRA_ENERGY) return { ok: false, msg: 'Too tired for a day on set.' };
+  spendEnergy(s, EXTRA_ENERGY);
+  const pay = Math.round(EXTRA_PAY * diffOf(s).payMult * rf(0.8, 1.2));
+  s.money += pay;
+  const skillGain = +rf(0.2, 0.5).toFixed(2);
+  s.acting = clamp(+(s.acting + skillGain).toFixed(1), 0, 100);
+  s.stats.extra = (s.stats.extra || 0) + 1;
+  let msg = `Worked as a background extra. +$${pay}, +${skillGain} acting.`;
+  // Occasionally make a connection on set (a fellow striver, low fame).
+  if (Math.random() < 0.18) {
+    const cs = makeCostar(Math.max(1, s.fame * 0.4));
+    cs.rel = clamp(cs.rel + rf(5, 12), 0, 100);
+    s.contacts.push(cs);
+    msg += ` You hit it off with ${cs.name} between takes.`;
+  }
+  // Rare: you actually make the final cut, for a sliver of fame.
+  if (Math.random() < 0.06) {
+    s.fame = clamp(+(s.fame + 0.5).toFixed(1), 0, 100);
+    msg += ' You made the final cut! +0.5 fame.';
+  }
+  pushLog(s, `🎬 ${msg}`);
+  return { ok: true, msg: `Earned $${pay} on set.` };
 }
 
 export function toggleAgent(s) {

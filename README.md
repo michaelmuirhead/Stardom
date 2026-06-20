@@ -48,6 +48,14 @@ Your odds depend on your **acting skill**, **fame**, **reputation**, and whether
 you have an **agent**. Land a role and you're in production for several weeks,
 earning pay and—on wrap—fame, skill, and prestige.
 
+**Starting out (the grind).** Every audition teaches you something — you gain a
+little acting craft win *or* lose. A near-miss earns a **📞 callback**: the role
+stays on the board with better odds next time instead of vanishing. When there's
+no role worth chasing, take **🎬 extra work** — background gigs that barely cover
+rent but build craft on-theme and occasionally introduce you to people on set.
+Side jobs remain the pure-cash safety net. The early game is a real climb:
+expect to scrape by for a while before you book enough to attract an agent.
+
 **Genre specialization.** Every role has a genre (🎭 Drama, 😂 Comedy, 💥 Action,
 👻 Horror, 🚀 Sci-Fi, 💖 Romance). The more you work in a genre, the better your
 audition odds for similar roles — and the more your top genre becomes your public

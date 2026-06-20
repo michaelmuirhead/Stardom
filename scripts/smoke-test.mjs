@@ -5,7 +5,7 @@ import { newGame } from '../js/state.js';
 import { DIFFICULTIES, GENRE_KEYS } from '../js/data.js';
 import {
   advanceWeek, audition, auditionChance, takeClass, network, rest, sideJob,
-  toggleAgent, writeScript, startProduction, isBusy, catchUp, quitSeries,
+  extraWork, toggleAgent, writeScript, startProduction, isBusy, catchUp, quitSeries,
 } from '../js/engine.js';
 
 let failures = 0;
@@ -26,7 +26,7 @@ function checkIntegrity(s, where) {
 // A reasonably competent AI so easy/normal careers don't bankrupt on noise.
 function playCareer(diffKey, weeks) {
   const s = newGame('CI Bot', diffKey);
-  const seen = { series: false, romance: false, cancellation: false, renewal: false };
+  const seen = { series: false, romance: false, cancellation: false, renewal: false, callback: false, extra: false };
   let logLen = 0;
 
   for (let i = 0; i < weeks && !s.gameOver; i++) {
@@ -36,12 +36,13 @@ function playCareer(diffKey, weeks) {
     if (s.energy < 22) {
       rest(s);
     } else if (!isBusy(s) && s.offers.length) {
+      const cb = s.offers.find((o) => o.callback);
       const ranked = [...s.offers].sort((a, b) => auditionChance(s, b) * b.pay - auditionChance(s, a) * a.pay);
-      const best = ranked[0];
+      const best = cb || ranked[0];
       if (s.money < 1000) sideJob(s);
-      else if (best && auditionChance(s, best) > 0.3) audition(s, best.id);
-      else if (s.money > 800 && s.energy >= 25) takeClass(s, 'acting');
-      else sideJob(s);
+      else if (best && auditionChance(s, best) > 0.25) audition(s, best.id);
+      else if (s.money > 1500 && s.energy >= 25 && Math.random() < 0.4) takeClass(s, 'acting');
+      else extraWork(s);
     } else if (s.money < 600) {
       sideJob(s);
     } else if (s.money > 800 && s.energy >= 25 && Math.random() < 0.4) {
@@ -68,11 +69,13 @@ function playCareer(diffKey, weeks) {
     logLen = Math.min(s.log.length, 80);
   }
 
-  // Detect renewal / cancellation by scanning the log.
+  // Detect renewal / cancellation / callbacks by scanning the log.
   for (const e of s.log) {
     if (/RENEWED/.test(e.msg)) seen.renewal = true;
     if (/CANCELLED/.test(e.msg)) seen.cancellation = true;
+    if (/Callback/.test(e.msg)) seen.callback = true;
   }
+  if ((s.stats.extra || 0) > 0) seen.extra = true;
   return { s, seen };
 }
 
@@ -85,7 +88,7 @@ for (const d of Object.values(DIFFICULTIES)) {
 }
 
 // 2) Run careers per difficulty
-const agg = { series: false, romance: false, renewal: false, cancellation: false, landed: 0 };
+const agg = { series: false, romance: false, renewal: false, cancellation: false, callback: false, extra: false, landed: 0 };
 for (const diffKey of Object.keys(DIFFICULTIES)) {
   // Run several times to smooth out RNG and exercise the systems.
   let survived = 0;
@@ -108,6 +111,8 @@ assert(agg.series, 'TV series system engaged (joined a series)');
 assert(agg.renewal, 'TV series renewals occurred');
 assert(agg.cancellation, 'TV series cancellations occurred');
 assert(agg.romance, 'co-star romance system engaged');
+assert(agg.extra, 'extra/background work was performed');
+assert(agg.callback, 'audition callbacks occurred');
 
 console.log('');
 if (failures) {
