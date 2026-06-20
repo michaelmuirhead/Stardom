@@ -1,8 +1,9 @@
 // ui.js — rendering & event wiring
-import { CLASSES, fameTier, AWARD_NAME } from './data.js';
+import { CLASSES, GENRES, GENRE_KEYS, fameTier, AWARD_NAME } from './data.js';
 import {
   audition, auditionChance, takeClass, network, rest, sideJob, toggleAgent,
   writeScript, sellScript, startProduction, advanceWeek, isBusy, BUDGET_TIERS,
+  catchUp, quitSeries, specialty, diffOf,
 } from './engine.js';
 
 let S = null;        // current game state
@@ -66,7 +67,21 @@ function renderBanner() {
   const parts = [];
   if (S.active) {
     const a = S.active;
-    parts.push(progressCard(`🎬 Filming "${a.role.title}" — ${a.role.part}`, a.totalWeeks - a.weeksLeft, a.totalWeeks, `${a.weeksLeft} wk left`));
+    const cs = (a.costars || []).map((c) => c.name).join(', ');
+    parts.push(progressCard(`${a.role.genreIcon} Filming "${a.role.title}" — ${a.role.part}`,
+      a.totalWeeks - a.weeksLeft, a.totalWeeks, `${a.weeksLeft} wk left`,
+      cs ? `with ${cs}` : ''));
+  }
+  if (S.activeSeries && S.activeSeries.status === 'filming') {
+    const sh = S.activeSeries;
+    const cs = (sh.costars || []).map((c) => c.name).join(', ');
+    const card = progressCard(`📡 "${sh.title}" — Season ${sh.season}`,
+      sh.totalWeeks - sh.weeksLeft, sh.totalWeeks, `${sh.weeksLeft} wk left`,
+      `${cs ? 'with ' + cs : ''}${sh.ratings ? ' · last rating ' + sh.ratings : ''}`);
+    const quit = actionBtn('🚪 Leave the show', () => { if (confirm('Leave this series for good?')) act(quitSeries(S)); });
+    quit.classList.add('mini');
+    card.appendChild(quit);
+    parts.push(card);
   }
   for (const p of S.productions) {
     parts.push(progressCard(`🎥 Producing "${p.title}" (${p.budgetName})`, p.totalWeeks - p.weeksLeft, p.totalWeeks, `${p.weeksLeft} wk left`));
@@ -78,11 +93,12 @@ function renderBanner() {
   parts.forEach((p) => b.appendChild(p));
 }
 
-function progressCard(label, done, total, right) {
+function progressCard(label, done, total, right, sub) {
   const pct = Math.round((done / total) * 100);
   const c = el('div', 'banner-active');
   c.innerHTML = `<div class="banner-row"><span>${label}</span><span class="muted">${right}</span></div>
-    <div class="bar"><div class="bar-fill" style="width:${pct}%"></div></div>`;
+    <div class="bar"><div class="bar-fill" style="width:${pct}%"></div></div>
+    ${sub ? `<div class="muted small" style="margin-top:6px">${sub}</div>` : ''}`;
   return c;
 }
 
@@ -91,6 +107,7 @@ const TABS = [
   ['auditions', '🎟️ Auditions'],
   ['train', '📚 Train'],
   ['create', '🎬 Create'],
+  ['people', '👥 People'],
   ['career', '👤 Career'],
 ];
 
@@ -111,6 +128,7 @@ function renderPanel() {
   if (activeTab === 'auditions') p.appendChild(auditionsView());
   else if (activeTab === 'train') p.appendChild(trainView());
   else if (activeTab === 'create') p.appendChild(createView());
+  else if (activeTab === 'people') p.appendChild(peopleView());
   else if (activeTab === 'career') p.appendChild(careerView());
 }
 
@@ -151,12 +169,12 @@ function roleCard(r) {
   c.innerHTML = `
     <div class="card-head"><span class="card-ic">${r.icon}</span>
       <div><div class="card-title">${r.title}</div>
-      <div class="muted small">${r.catName} · ${r.part}</div></div></div>
+      <div class="muted small">${r.genreIcon} ${r.genreName} ${r.catName} · ${r.part}</div></div></div>
     <div class="reqs">
       <span>💵 ${money(r.pay)}</span>
       <span>⭐ +${r.fameGain}</span>
       <span>🎭 +${r.skillGain}</span>
-      <span>⏱️ ${r.weeks} wk</span>
+      <span>${r.category === 'tvshow' ? '📺 series' : '⏱️ ' + r.weeks + ' wk'}</span>
     </div>
     <div class="reqs muted small">
       <span>Needs acting ${r.skillReq}</span>
@@ -282,10 +300,48 @@ function labeled(label, node) {
   return w;
 }
 
+// ---- People view (co-stars & relationships) --------------------------------
+function peopleView() {
+  const wrap = el('div', 'view');
+  wrap.appendChild(el('h2', null, '👥 Relationships'));
+  wrap.appendChild(el('p', 'muted small', 'Co-stars you work with become contacts. Close, famous friends boost your audition odds, and on-set chemistry can turn romantic. Catch up to keep bonds strong.'));
+
+  if (S.partner) {
+    const p = S.contacts.find((c) => c.id === S.partner);
+    if (p) wrap.appendChild(el('div', 'panel-block', `💞 <b>Dating ${p.name}</b> <span class="muted">(fame ${p.fame})</span> — Hollywood's favorite couple.`));
+  }
+
+  if (!S.contacts.length) {
+    wrap.appendChild(el('p', 'muted', 'You haven\'t met anyone yet. Land a role to meet your first co-stars.'));
+    return wrap;
+  }
+
+  const sorted = [...S.contacts].sort((a, b) => b.rel - a.rel);
+  const grid = el('div', 'grid');
+  for (const c of sorted) {
+    const card = el('div', 'card');
+    const relCls = c.rel >= 60 ? 'good' : c.rel >= 30 ? 'mid' : 'bad';
+    card.innerHTML = `
+      <div class="card-head"><span class="card-ic">${c.romance ? '💞' : '🎭'}</span>
+        <div><div class="card-title">${c.name}</div>
+        <div class="muted small">⭐ Fame ${c.fame} · ${c.projects} project${c.projects === 1 ? '' : 's'} together</div></div></div>
+      <div class="bar"><div class="bar-fill" style="width:${c.rel}%"></div></div>
+      <div class="reqs small"><span class="${relCls}">Relationship ${Math.round(c.rel)}/100</span></div>`;
+    card.appendChild(actionBtn('☕ Catch up (10⚡)', () => act(catchUp(S, c.id)), S.energy < 10));
+    grid.appendChild(card);
+  }
+  wrap.appendChild(grid);
+  return wrap;
+}
+
 // ---- Career view (profile, filmography, awards) ----------------------------
 function careerView() {
   const wrap = el('div', 'view');
-  wrap.appendChild(el('h2', null, `👤 ${S.name} — ${fameTier(S.fame)}`));
+  const spec = specialty(S);
+  const title = spec ? `${fameTier(S.fame)} · ${spec.icon} ${spec.specialty}` : fameTier(S.fame);
+  wrap.appendChild(el('h2', null, `👤 ${S.name} — ${title}`));
+  const D = diffOf(S);
+  wrap.appendChild(el('p', 'muted small', `${D.icon} ${D.name} difficulty`));
 
   const skills = el('div', 'skills');
   for (const [lab, key] of [['Acting', 'acting'], ['Directing', 'directing'], ['Writing', 'writing'], ['Producing', 'producing']]) {
@@ -297,10 +353,27 @@ function careerView() {
   }
   wrap.appendChild(skills);
 
+  // Genre specialization
+  wrap.appendChild(el('h3', null, '🎬 Genre Specialization'));
+  const maxAff = Math.max(1, ...GENRE_KEYS.map((k) => S.genres[k] || 0));
+  const gskills = el('div', 'skills');
+  for (const k of GENRE_KEYS) {
+    const v = S.genres[k] || 0;
+    const row = el('div', 'skill-row');
+    row.innerHTML = `<span class="skill-lab">${GENRES[k].icon} ${GENRES[k].name}</span>
+      <div class="bar"><div class="bar-fill" style="width:${(v / maxAff) * 100}%"></div></div>
+      <span class="skill-num">${v.toFixed(0)}</span>`;
+    gskills.appendChild(row);
+  }
+  wrap.appendChild(gskills);
+  wrap.appendChild(el('p', 'muted small', 'More experience in a genre raises your audition odds for similar roles — and defines your public brand.'));
+
   const meta = el('div', 'meta-row');
   meta.innerHTML = `<span>Agent: ${S.hasAgent ? '✅ Signed' : '— None'}</span>
     <span>Auditions: ${S.stats.auditions}</span>
     <span>Roles landed: ${S.stats.landed}</span>
+    <span>TV seasons: ${S.stats.seasons || 0}</span>
+    <span>Contacts: ${S.contacts.length}</span>
     <span>Classes: ${S.stats.classes}</span>`;
   wrap.appendChild(meta);
 

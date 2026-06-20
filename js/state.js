@@ -1,11 +1,13 @@
 // state.js — game state creation, persistence
-import { START, fullName, makeRole } from './data.js';
+import { START, DIFFICULTIES, GENRE_KEYS, fullName, makeRole } from './data.js';
 
 const SAVE_KEY = 'stardom.save.v1';
 
-export function newGame(playerName) {
+export function newGame(playerName, difficultyKey) {
+  const diff = DIFFICULTIES[difficultyKey] || DIFFICULTIES.normal;
   const s = {
     name: playerName || fullName(),
+    difficulty: diff.key,
     week: 1,
     year: 1,
     ...structuredCloneSafe(START),
@@ -13,19 +15,25 @@ export function newGame(playerName) {
     energyPenalty: 0,
 
     offers: [],          // available audition roles
-    active: null,        // role currently in production: {role, weeksLeft}
+    active: null,        // acting role in production: {role, weeksLeft, costars}
+    activeSeries: null,  // ongoing TV series (renewal/cancellation arc)
     scripts: [],         // written scripts available to produce/shop
     productions: [],      // self-produced projects in progress
     filmography: [],     // completed credits {title, category, year, role}
     awards: [],          // {name, year, project}
 
+    genres: Object.fromEntries(GENRE_KEYS.map((k) => [k, 0])), // affinity XP
+    contacts: [],        // co-stars & industry relationships
+    partner: null,       // current romantic partner (contact id)
+
     yearPrestige: 0,     // prestige accumulated this year (for award season)
-    stats: { auditions: 0, landed: 0, classes: 0 },
+    stats: { auditions: 0, landed: 0, classes: 0, seasons: 0 },
     gameOver: false,
     log: [],
   };
+  s.money = diff.startMoney;
   refreshOffers(s);
-  pushLog(s, `🎬 ${s.name} arrives in town with $${s.money} and a dream.`);
+  pushLog(s, `🎬 ${s.name} arrives in town with $${s.money} and a dream. (${diff.name} mode)`);
   return s;
 }
 

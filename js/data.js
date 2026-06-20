@@ -15,8 +15,38 @@ export const START = {
 };
 
 export const WEEKS_PER_YEAR = 52;
-export const LIVING_COST = 220;          // weekly expenses
+export const LIVING_COST = 220;          // weekly expenses (Normal baseline)
 export const AGENT_CUT = 0.12;           // agent takes a slice of role pay
+
+// ---- Difficulty ------------------------------------------------------------
+export const DIFFICULTIES = {
+  easy: {
+    key: 'easy', name: 'Easy', icon: '🌱',
+    startMoney: 3000, living: 160, payMult: 1.25, oddsBonus: 0.08, debtFloor: -5000,
+    blurb: 'Generous pay, forgiving auditions. Learn the ropes.',
+  },
+  normal: {
+    key: 'normal', name: 'Normal', icon: '🎯',
+    startMoney: 1500, living: 220, payMult: 1.0, oddsBonus: 0, debtFloor: -3000,
+    blurb: 'The intended Hollywood grind.',
+  },
+  hard: {
+    key: 'hard', name: 'Hard', icon: '🔥',
+    startMoney: 700, living: 300, payMult: 0.85, oddsBonus: -0.08, debtFloor: -2000,
+    blurb: 'Lean wallet, brutal odds. Only the dedicated survive.',
+  },
+};
+
+// ---- Genres ----------------------------------------------------------------
+export const GENRES = {
+  drama: { key: 'drama', name: 'Drama', icon: '🎭', specialty: 'Dramatic Actor' },
+  comedy: { key: 'comedy', name: 'Comedy', icon: '😂', specialty: 'Comedian' },
+  action: { key: 'action', name: 'Action', icon: '💥', specialty: 'Action Star' },
+  horror: { key: 'horror', name: 'Horror', icon: '👻', specialty: 'Scream King/Queen' },
+  scifi: { key: 'scifi', name: 'Sci-Fi', icon: '🚀', specialty: 'Sci-Fi Icon' },
+  romance: { key: 'romance', name: 'Romance', icon: '💖', specialty: 'Heartthrob' },
+};
+export const GENRE_KEYS = Object.keys(GENRES);
 
 // ---- Project categories ---------------------------------------------------
 // tier roughly = fame gate. Higher tiers pay & raise fame more, but are harder.
@@ -92,6 +122,7 @@ export function makeRole(playerFame) {
   const skillGain = +(cat.skillBase * rf(0.8, 1.4) + tier * 0.6).toFixed(1);
   const weeks = cat.weeks[tier];
   const prestige = +(cat.prestige * mult * rf(0.7, 1.2)).toFixed(2);
+  const genre = pick(GENRE_KEYS);
 
   return {
     id: 'r' + Math.random().toString(36).slice(2, 9),
@@ -100,6 +131,9 @@ export function makeRole(playerFame) {
     catName: cat.name,
     icon: cat.icon,
     part: pick(PART),
+    genre,
+    genreName: GENRES[genre].name,
+    genreIcon: GENRES[genre].icon,
     tier,
     skillReq: Math.max(3, skillReq),
     fameReq: Math.max(0, fameReq),
@@ -110,6 +144,21 @@ export function makeRole(playerFame) {
     prestige,
   };
 }
+
+// Generate a co-star scaled around the player's fame.
+export function makeCostar(playerFame) {
+  const fame = Math.round(clampNum(playerFame + rf(-15, 35), 1, 100));
+  return {
+    id: 'cs' + Math.random().toString(36).slice(2, 9),
+    name: fullName(),
+    fame,
+    rel: 0,        // relationship 0..100
+    projects: 0,
+    romance: false,
+  };
+}
+
+function clampNum(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
 // ---- Classes / training ----------------------------------------------------
 export const CLASSES = [

@@ -61,6 +61,17 @@ body {
 }
 .start-actions { display: flex; gap: 12px; justify-content: center; margin-bottom: 16px; }
 
+.difficulty { display: flex; flex-direction: column; gap: 8px; }
+.diff-opt {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  text-align: left; background: var(--card); border: 1px solid var(--line);
+  color: var(--txt); border-radius: 10px; padding: 10px 14px; cursor: pointer;
+}
+.diff-opt:hover { background: #2c2f47; }
+.diff-opt.active { border-color: var(--gold); background: #2a2718; }
+.diff-name { font-weight: 700; }
+.diff-blurb { font-size: 12px; color: var(--muted); }
+
 /* ---- Layout ---- */
 header {
   display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
@@ -179,6 +190,7 @@ main {
 .btn.primary { background: linear-gradient(90deg, var(--gold), var(--gold2)); color: #2a1d00; border: none; }
 .btn.primary:hover:not(:disabled) { filter: brightness(1.05); }
 .btn.big { padding: 13px 26px; font-size: 16px; }
+.btn.mini { padding: 5px 10px; font-size: 12px; margin-top: 8px; align-self: flex-start; }
 
 footer {
   position: sticky; bottom: 0; padding: 14px 20px;

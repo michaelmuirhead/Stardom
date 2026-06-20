@@ -1,20 +1,48 @@
 // engine.js — core game mechanics
 import {
-  WEEKS_PER_YEAR, LIVING_COST, AGENT_CUT, CLASSES, EVENTS,
-  AWARD_NAME, projectTitle, makeRole,
+  WEEKS_PER_YEAR, AGENT_CUT, CLASSES, EVENTS,
+  AWARD_NAME, DIFFICULTIES, GENRES, GENRE_KEYS,
+  projectTitle, makeRole, makeCostar,
 } from './data.js';
 import { pushLog, refreshOffers } from './state.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const rf = (a, b) => a + Math.random() * (b - a);
 
+// ---- Difficulty / genre helpers -------------------------------------------
+export function diffOf(s) { return DIFFICULTIES[s.difficulty] || DIFFICULTIES.normal; }
+
+export function genreAffinity(s, genre) {
+  return (s.genres && s.genres[genre]) || 0;
+}
+
+// The genre you've worked in most — your public "specialty".
+export function specialty(s) {
+  if (!s.genres) return null;
+  let best = null, bestV = 8; // need some minimum before you have a brand
+  for (const k of GENRE_KEYS) {
+    if (s.genres[k] > bestV) { bestV = s.genres[k]; best = k; }
+  }
+  return best ? { key: best, ...GENRES[best], value: bestV } : null;
+}
+
 // ---- Helpers ---------------------------------------------------------------
 export function isBusy(s) {
-  return !!s.active || s.productions.some((p) => p.weeksLeft > 0);
+  return !!s.active
+    || (s.activeSeries && s.activeSeries.status === 'filming')
+    || s.productions.some((p) => p.weeksLeft > 0);
 }
 
 function spendEnergy(s, amount) {
   s.energy = clamp(s.energy - amount, 0, s.maxEnergy);
+}
+
+// Best-connected famous friend gives you an audition edge.
+function connectionBonus(s) {
+  if (!s.contacts || !s.contacts.length) return 0;
+  let best = 0;
+  for (const c of s.contacts) best = Math.max(best, (c.rel / 100) * (c.fame / 100));
+  return best * 0.12; // up to +0.12 odds from a powerful ally
 }
 
 // ---- Auditioning -----------------------------------------------------------
@@ -25,7 +53,11 @@ export function auditionChance(s, role) {
   const repFactor = (s.reputation - 30) / 200;
   let chance = 0.42 + skillFactor + fameFactor + repFactor;
   if (s.hasAgent) chance += 0.08;
-  return clamp(chance, 0.03, 0.95);
+  chance += diffOf(s).oddsBonus;
+  chance += connectionBonus(s);
+  // Specialization: experience in this genre makes you a natural fit.
+  chance += clamp(genreAffinity(s, role.genre) / 250, 0, 0.2);
+  return clamp(chance, 0.03, 0.97);
 }
 
 export function audition(s, roleId) {
@@ -46,12 +78,153 @@ export function audition(s, roleId) {
 
   if (won) {
     s.stats.landed++;
-    s.active = { role, weeksLeft: role.weeks, totalWeeks: role.weeks };
-    pushLog(s, `✅ You landed ${role.part} in "${role.title}" (${role.catName})! Production starts now.`);
+    const costars = castCostars(s);
+    const names = costars.map((c) => c.name).join(' & ');
+    if (role.category === 'tvshow') {
+      startSeries(s, role, costars);
+      pushLog(s, `✅ You're a series regular on "${role.title}" (${role.genreName}) alongside ${names}! Season 1 begins.`);
+      return { ok: true, won: true, msg: `You joined the cast of "${role.title}"!` };
+    }
+    s.active = { role, weeksLeft: role.weeks, totalWeeks: role.weeks, costars };
+    pushLog(s, `✅ You landed ${role.part} in "${role.title}" (${role.genreName} ${role.catName}) with ${names}! Filming starts now.`);
     return { ok: true, won: true, msg: `You got the part in "${role.title}"!` };
   }
   pushLog(s, `❌ You auditioned for "${role.title}" but didn't get it. (${Math.round(chance * 100)}% odds)`);
   return { ok: true, won: false, msg: `No luck on "${role.title}".` };
+}
+
+// ---- Co-stars & relationships ---------------------------------------------
+// Assign 1-2 co-stars to a project: sometimes a familiar face, sometimes new.
+function castCostars(s) {
+  const out = [];
+  const n = 1 + (Math.random() < 0.5 ? 1 : 0);
+  for (let i = 0; i < n; i++) {
+    const known = s.contacts.filter((c) => c.rel >= 25 && !out.includes(c));
+    if (known.length && Math.random() < 0.4) {
+      out.push(known[Math.floor(Math.random() * known.length)]);
+    } else {
+      const cs = makeCostar(s.fame);
+      s.contacts.push(cs);
+      out.push(cs);
+    }
+  }
+  return out;
+}
+
+// Wrapping a shared project deepens relationships & rubs off star power.
+function bondWithCostars(s, costars) {
+  let starPower = 0;
+  for (const c of costars) {
+    c.projects = (c.projects || 0) + 1;
+    c.rel = clamp(c.rel + rf(8, 16), 0, 100);
+    starPower += Math.max(0, c.fame - s.fame);
+    // A close, famous co-star can spark on-set romance.
+    if (!s.partner && !c.romance && c.rel > 55 && Math.random() < 0.2) {
+      c.romance = true;
+      s.partner = c.id;
+      s.fame = clamp(s.fame + 3, 0, 100);
+      pushLog(s, `💞 On-set sparks: you and ${c.name} are now an item! The press loves it. +3 fame.`);
+    }
+  }
+  return starPower;
+}
+
+export function catchUp(s, contactId) {
+  if (s.gameOver) return { ok: false, msg: 'The game is over.' };
+  if (s.energy < 10) return { ok: false, msg: 'Too tired to socialize.' };
+  const c = s.contacts.find((x) => x.id === contactId);
+  if (!c) return { ok: false, msg: 'Contact not found.' };
+  spendEnergy(s, 10);
+  c.rel = clamp(c.rel + rf(5, 10), 0, 100);
+  s.reputation = clamp(s.reputation + 0.5, 0, 100);
+  pushLog(s, `☕ You caught up with ${c.name}. Relationship grew.`);
+  return { ok: true, msg: `You and ${c.name} are closer.` };
+}
+
+// ---- TV series renewal / cancellation arc ---------------------------------
+const SERIES_SEASON_WEEKS = 8;
+
+function startSeries(s, role, costars) {
+  s.activeSeries = {
+    title: role.title,
+    genre: role.genre,
+    genreName: role.genreName,
+    genreIcon: role.genreIcon,
+    part: role.part,
+    costars,
+    season: 1,
+    weeksLeft: SERIES_SEASON_WEEKS,
+    totalWeeks: SERIES_SEASON_WEEKS,
+    salary: role.pay,                 // per season
+    fameGain: role.fameGain,
+    skillGain: role.skillGain,
+    prestige: role.prestige,
+    ratings: 0,
+    status: 'filming',
+  };
+  s.stats.seasons++;
+}
+
+export function quitSeries(s) {
+  if (!s.activeSeries) return { ok: false, msg: 'You\'re not on a series.' };
+  const sh = s.activeSeries;
+  s.filmography.push({
+    title: `${sh.title} (${sh.season} season${sh.season > 1 ? 's' : ''})`,
+    category: 'TV Series', year: s.year, role: sh.part,
+    quality: Math.round(sh.ratings || 50),
+  });
+  pushLog(s, `🚪 You left "${sh.title}" after ${sh.season} season(s) to pursue other work.`);
+  s.activeSeries = null;
+  return { ok: true, msg: `You left "${sh.title}".` };
+}
+
+// Resolve the end of a TV season: pay out, then renew or cancel.
+function endSeason(s) {
+  const sh = s.activeSeries;
+  // Season payoff (gains taper a little each season).
+  const taper = Math.max(0.5, 1 - (sh.season - 1) * 0.08);
+  const fg = +(sh.fameGain * taper).toFixed(1);
+  const sg = +(sh.skillGain * taper).toFixed(1);
+  s.fame = clamp(+(s.fame + fg).toFixed(1), 0, 100);
+  s.acting = clamp(+(s.acting + sg).toFixed(1), 0, 100);
+  s.reputation = clamp(s.reputation + sh.prestige, 0, 100);
+  s.yearPrestige += sh.prestige;
+  awardGenreXp(s, sh.genre, 2 + sh.prestige);
+  const starPower = bondWithCostars(s, sh.costars);
+
+  // Ratings drive renewal: your fame & craft + co-star draw, minus fatigue.
+  sh.ratings = Math.round(clamp(
+    s.fame * 0.5 + s.acting * 0.2 + starPower * 0.3 + rf(-8, 14) - (sh.season - 1) * 4,
+    5, 100,
+  ));
+  const renewChance = clamp(sh.ratings / 110 + diffOf(s).oddsBonus, 0.08, 0.93);
+
+  if (Math.random() < renewChance) {
+    sh.season++;
+    sh.salary = Math.round(sh.salary * 1.12);  // raises each season
+    sh.weeksLeft = SERIES_SEASON_WEEKS;
+    sh.totalWeeks = SERIES_SEASON_WEEKS;
+    sh.status = 'filming';
+    s.stats.seasons++;
+    pushLog(s, `📈 "${sh.title}" was RENEWED for season ${sh.season}! (${sh.ratings} rating, +12% pay). +${fg} fame.`);
+  } else {
+    // Cancellation: a long run earns a prestigious finale.
+    const finale = +(sh.prestige * Math.min(sh.season, 6) * 0.6).toFixed(2);
+    s.yearPrestige += finale;
+    s.reputation = clamp(s.reputation + finale, 0, 100);
+    s.filmography.push({
+      title: `${sh.title} (${sh.season} season${sh.season > 1 ? 's' : ''})`,
+      category: 'TV Series', year: s.year, role: sh.part,
+      quality: sh.ratings,
+    });
+    pushLog(s, `📉 "${sh.title}" was CANCELLED after ${sh.season} season(s) (${sh.ratings} rating). A ${sh.season >= 3 ? 'beloved' : 'brief'} run wraps. +${fg} fame.`);
+    s.activeSeries = null;
+  }
+}
+
+function awardGenreXp(s, genre, amount) {
+  if (!s.genres) return;
+  s.genres[genre] = +((s.genres[genre] || 0) + amount).toFixed(1);
 }
 
 // ---- Training --------------------------------------------------------------
@@ -271,29 +444,46 @@ function awardSeason(s) {
 export function advanceWeek(s) {
   if (s.gameOver) return;
 
+  const D = diffOf(s);
+
   // Living expenses
-  s.money -= LIVING_COST;
+  s.money -= D.living;
 
   // Active acting role progresses
   if (s.active) {
     const a = s.active;
-    const weekly = Math.round(a.role.pay / a.totalWeeks);
+    const weekly = Math.round(a.role.pay * D.payMult / a.totalWeeks);
     const net = s.hasAgent ? Math.round(weekly * (1 - AGENT_CUT)) : weekly;
     s.money += net;
     a.weeksLeft--;
     if (a.weeksLeft <= 0) {
-      // Wrap: apply fame/skill/prestige payoff
-      s.fame = clamp(+(s.fame + a.role.fameGain).toFixed(1), 0, 100);
+      // Wrap: bond with co-stars; their star power rubs off on your fame.
+      const starPower = bondWithCostars(s, a.costars || []);
+      const rubOff = +(starPower * 0.04).toFixed(1);
+      const fameGain = +(a.role.fameGain + rubOff).toFixed(1);
+      s.fame = clamp(+(s.fame + fameGain).toFixed(1), 0, 100);
       s.acting = clamp(+(s.acting + a.role.skillGain).toFixed(1), 0, 100);
       s.reputation = clamp(s.reputation + a.role.prestige * 2, 0, 100);
       s.yearPrestige += a.role.prestige;
+      awardGenreXp(s, a.role.genre, 1.5 + a.role.prestige);
       s.filmography.push({
         title: a.role.title, category: a.role.catName, year: s.year,
-        role: a.role.part, quality: Math.round(50 + a.role.prestige * 10),
+        role: a.role.part, genre: a.role.genreName,
+        quality: Math.round(50 + a.role.prestige * 10),
       });
-      pushLog(s, `🎉 "${a.role.title}" wrapped! +${a.role.fameGain} fame, +${a.role.skillGain} acting.`);
+      const rubMsg = rubOff > 0 ? ` (+${rubOff} from famous co-stars)` : '';
+      pushLog(s, `🎉 "${a.role.title}" wrapped! +${fameGain} fame${rubMsg}, +${a.role.skillGain} acting.`);
       s.active = null;
     }
+  }
+
+  // TV series (renewal/cancellation arc)
+  if (s.activeSeries && s.activeSeries.status === 'filming') {
+    const sh = s.activeSeries;
+    const weekly = Math.round(sh.salary * D.payMult / sh.totalWeeks);
+    s.money += s.hasAgent ? Math.round(weekly * (1 - AGENT_CUT)) : weekly;
+    sh.weeksLeft--;
+    if (sh.weeksLeft <= 0) endSeason(s);
   }
 
   // Self-produced projects progress
@@ -327,7 +517,7 @@ export function advanceWeek(s) {
   }
 
   // Lose condition: deep, sustained debt
-  if (s.money < -3000) {
+  if (s.money < D.debtFloor) {
     s.gameOver = true;
     s.gameOverReason = 'bankrupt';
     pushLog(s, '💀 Bankrupt. You leave town, dreams unfulfilled. Game over.');

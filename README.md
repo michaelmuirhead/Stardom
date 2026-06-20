@@ -15,8 +15,17 @@ python3 -m http.server 8000
 # then visit http://localhost:8000
 ```
 
-Enter a stage name (or leave blank for a random one) and start your career.
-Progress autosaves to your browser — use **Continue** to resume.
+Enter a stage name (or leave blank for a random one), pick a **difficulty**,
+and start your career. Progress autosaves to your browser — use **Continue**
+to resume.
+
+### Difficulty
+
+| Mode | Start $ | Weekly cost | Pay | Audition odds | Bankruptcy at |
+|------|---------|-------------|-----|---------------|---------------|
+| 🌱 Easy | $3,000 | $160 | +25% | +8% | −$5,000 |
+| 🎯 Normal | $1,500 | $220 | — | — | −$3,000 |
+| 🔥 Hard | $700 | $300 | −15% | −8% | −$2,000 |
 
 ## The career
 
@@ -37,6 +46,23 @@ the industry:
 Your odds depend on your **acting skill**, **fame**, **reputation**, and whether
 you have an **agent**. Land a role and you're in production for several weeks,
 earning pay and—on wrap—fame, skill, and prestige.
+
+**Genre specialization.** Every role has a genre (🎭 Drama, 😂 Comedy, 💥 Action,
+👻 Horror, 🚀 Sci-Fi, 💖 Romance). The more you work in a genre, the better your
+audition odds for similar roles — and the more your top genre becomes your public
+brand (e.g. *Action Star*, *Scream Queen*), shown on your Career page.
+
+**Co-stars & relationships.** Land a role and you meet co-stars, who become
+lasting contacts. A close, famous ally boosts your audition odds; a famous
+co-star's star power rubs off as extra fame when a project wraps. Visit the
+**People** tab to *catch up* and strengthen bonds — and on-set chemistry can
+turn into a headline-making romance.
+
+**TV series renewal arc.** Joining a TV series isn't a one-off — it runs
+**season by season**. At each season's end the show earns a **rating** (driven
+by your fame, craft, and co-star draw, minus fatigue) and is **renewed** (with a
+12% raise) or **cancelled**. A long-running hit pays off with a prestigious
+finale; you can also choose to leave the show at any time.
 
 **Build your craft** in the Train tab: acting, plus directing, screenwriting,
 and producing (which unlock as your fame grows).
