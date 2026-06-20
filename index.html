@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stardom — An Actor's Journey</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <!-- Start screen -->
+  <div id="startScreen" class="start">
+    <div class="start-card">
+      <h1 class="logo">⭐ STARDOM</h1>
+      <p class="tagline">From unknown to icon. Build an actor's career — auditions,
+        TV, film, commercials, then write, direct &amp; produce your own.</p>
+      <label class="start-field">
+        <span>Your stage name</span>
+        <input id="playerName" type="text" maxlength="28" placeholder="Leave blank for a random name" />
+      </label>
+      <div class="start-actions">
+        <button id="newBtn" class="btn primary big">🎬 New Career</button>
+        <button id="continueBtn" class="btn big" style="display:none">↩️ Continue</button>
+      </div>
+      <p class="muted small">Tip: spend energy on auditions &amp; classes, then Advance the Week to make progress.</p>
+    </div>
+  </div>
+
+  <!-- Game -->
+  <div id="game" style="display:none">
+    <header>
+      <div class="brand">⭐ STARDOM</div>
+      <div id="stats" class="stats"></div>
+    </header>
+
+    <div id="banner" class="banner"></div>
+
+    <main>
+      <section class="left">
+        <nav id="tabs" class="tabs"></nav>
+        <div id="panel" class="panel"></div>
+      </section>
+      <aside id="log" class="log"></aside>
+    </main>
+
+    <footer>
+      <button id="advance" class="btn primary big">⏭️ Advance Week</button>
+    </footer>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
