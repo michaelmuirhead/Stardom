@@ -250,7 +250,7 @@ function endSeason(s) {
 }
 
 function awardGenreXp(s, genre, amount) {
-  if (!s.genres) return;
+  if (!s.genres || !genre) return;
   s.genres[genre] = +((s.genres[genre] || 0) + amount).toFixed(1);
 }
 
@@ -386,13 +386,20 @@ export function writeScript(s) {
   if (s.energy < 30) return { ok: false, msg: 'Too tired to write.' };
   spendEnergy(s, 30);
   const quality = clamp(Math.round(s.writing * rf(0.6, 1.1) + rf(-5, 8)), 5, 100);
+  const genre = GENRE_KEYS[Math.floor(Math.random() * GENRE_KEYS.length)];
   const script = {
     id: 'sc' + Math.random().toString(36).slice(2, 8),
     title: projectTitle(Math.random() < 0.5 ? 'movie' : 'tvshow'),
+    genre,
+    genreName: GENRES[genre].name,
+    genreIcon: GENRES[genre].icon,
     quality,
   };
   s.scripts.push(script);
-  pushLog(s, `✍️ You finished a script: "${script.title}" (quality ${quality}).`);
+  // Learn by doing: every script sharpens your writing.
+  const skillGain = +rf(0.3, 0.8).toFixed(2);
+  s.writing = clamp(+(s.writing + skillGain).toFixed(1), 0, 100);
+  pushLog(s, `✍️ You finished a ${script.genreName} script: "${script.title}" (quality ${quality}). +${skillGain} writing.`);
   return { ok: true, msg: `Wrote "${script.title}".` };
 }
 
@@ -431,6 +438,7 @@ export function startProduction(s, { budgetKey, scriptId, direct }) {
   }
   s.money -= tier.cost;
   const weeks = tier.key === 'micro' ? 6 : tier.key === 'mid' ? 10 : 16;
+  const genre = (script && script.genre) || GENRE_KEYS[Math.floor(Math.random() * GENRE_KEYS.length)];
   const prod = {
     id: 'pr' + Math.random().toString(36).slice(2, 8),
     title: script ? script.title : projectTitle('movie'),
@@ -439,12 +447,15 @@ export function startProduction(s, { budgetKey, scriptId, direct }) {
     cost: tier.cost,
     scale: tier.scale,
     scriptQuality: script ? script.quality : 35,
+    genre,
+    genreName: GENRES[genre].name,
+    genreIcon: GENRES[genre].icon,
     directed: !!direct,
     weeksLeft: weeks,
     totalWeeks: weeks,
   };
   s.productions.push(prod);
-  pushLog(s, `🎬 You're producing "${prod.title}" (${tier.name})${direct ? ' and directing it' : ''}.`);
+  pushLog(s, `🎬 You're producing ${prod.genreName} project "${prod.title}" (${tier.name})${direct ? ' and directing it' : ''}.`);
   return { ok: true, msg: `Production started on "${prod.title}".` };
 }
 
@@ -466,9 +477,10 @@ function wrapProduction(s, prod) {
   s.reputation = clamp(s.reputation + q / 25, 0, 100);
   if (prod.directed) s.directing = clamp(+(s.directing + 1).toFixed(1), 0, 100);
   s.producing = clamp(+(s.producing + 1).toFixed(1), 0, 100);
+  awardGenreXp(s, prod.genre, 1 + prestige);
 
   s.filmography.push({
-    title: prod.title, category: 'Produced', year: s.year,
+    title: prod.title, category: 'Produced', year: s.year, genre: prod.genreName,
     role: prod.directed ? 'Producer / Director' : 'Producer', quality: Math.round(q),
   });
 

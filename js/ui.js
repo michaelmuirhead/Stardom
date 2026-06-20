@@ -84,7 +84,7 @@ function renderBanner() {
     parts.push(card);
   }
   for (const p of S.productions) {
-    parts.push(progressCard(`🎥 Producing "${p.title}" (${p.budgetName})`, p.totalWeeks - p.weeksLeft, p.totalWeeks, `${p.weeksLeft} wk left`));
+    parts.push(progressCard(`${p.genreIcon || '🎥'} Producing "${p.title}" (${p.budgetName})`, p.totalWeeks - p.weeksLeft, p.totalWeeks, `${p.weeksLeft} wk left`));
   }
   if (!parts.length) {
     b.appendChild(el('div', 'banner-idle', '🟢 You\'re free this week — audition, train, or create.'));
@@ -248,7 +248,7 @@ function createView() {
     for (const sc of S.scripts) {
       const card = el('div', 'card');
       card.innerHTML = `<div class="card-title">📄 ${sc.title}</div>
-        <div class="muted small">Quality ${sc.quality}</div>`;
+        <div class="muted small">${sc.genreIcon ? sc.genreIcon + ' ' + sc.genreName + ' · ' : ''}Quality ${sc.quality}</div>`;
       card.appendChild(actionBtn('💰 Sell to studio', () => act(sellScript(S, sc.id))));
       grid.appendChild(card);
     }
@@ -284,7 +284,7 @@ function producerForm() {
   none.value = '';
   sSel.appendChild(none);
   for (const sc of S.scripts) {
-    const o = el('option', null, `${sc.title} (Q${sc.quality})`);
+    const o = el('option', null, `${sc.genreIcon ? sc.genreIcon + ' ' : ''}${sc.title} (Q${sc.quality})`);
     o.value = sc.id;
     sSel.appendChild(o);
   }
@@ -304,7 +304,7 @@ function producerForm() {
   block.appendChild(labeled('Script', sSel));
   block.appendChild(dirLabel);
   block.appendChild(actionBtn('🎬 Greenlight production', () => act(startProduction(S, state))));
-  block.appendChild(el('p', 'muted small', 'Producing ties up no energy but locks in your money. Quality (and box office) depend on your script, producing skill, and—if you direct—your directing skill.'));
+  block.appendChild(el('p', 'muted small', 'Producing ties up no energy but locks in your money. Quality (and box office) depend on your script, producing skill, and—if you direct—your directing skill. Each production also builds your affinity in its genre.'));
   return block;
 }
 

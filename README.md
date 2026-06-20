@@ -83,10 +83,11 @@ finale; you can also choose to leave the show at any time.
 and producing (which unlock as your fame grows).
 
 **Create your own work** in the Create tab once you've trained:
-- ✍️ **Write scripts** — sell them to studios, or produce them yourself.
+- ✍️ **Write scripts** — sell them to studios, or produce them yourself. Each
+  script has a genre and sharpens your writing skill (you learn by doing).
 - 🎬 **Produce** films at micro / mid / blockbuster budgets. Box office depends
   on script quality, your producing skill, and—if you also **direct**—your
-  directing skill.
+  directing skill. Each production also builds your affinity in its genre.
 
 **Award season** happens at the end of each year. Prestigious work earns
 nominations and possibly a **Golden Star**, rocketing your fame and reputation.
