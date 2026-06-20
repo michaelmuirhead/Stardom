@@ -11,8 +11,9 @@ No build step, no dependencies. Just open it in a browser.
 Open `index.html` in any modern browser, or serve the folder locally:
 
 ```bash
+npm run dev        # serves on http://localhost:8000
+# or, without npm:
 python3 -m http.server 8000
-# then visit http://localhost:8000
 ```
 
 Enter a stage name (or leave blank for a random one), pick a **difficulty**,
@@ -93,3 +94,48 @@ js/main.js        # bootstrap
 
 The data/state/engine layers are DOM-free, so the game logic can be simulated
 and tested headlessly with Node.
+
+## Development
+
+```bash
+npm run check   # syntax-check every module
+npm test        # run the headless engine smoke test (simulates full careers)
+npm run dev     # serve locally on :8000
+```
+
+`npm test` runs `scripts/smoke-test.mjs`, which plays simulated careers across
+all difficulties and asserts the engine stays consistent and that every system
+(TV-series renewals/cancellations, co-star romance, etc.) actually fires. This
+test gates every push and pull request via GitHub Actions (`.github/workflows/ci.yml`).
+
+## Deploy
+
+The game is a static site, so hosting is zero-build.
+
+### Vercel (recommended)
+
+1. Push this repo to GitHub.
+2. In the [Vercel dashboard](https://vercel.com/new), **Import** the GitHub repo.
+3. Framework Preset: **Other** — leave Build Command empty and Output Directory
+   as `.` (the included `vercel.json` already declares this).
+4. **Deploy.** Vercel serves `main` as production and gives every branch/PR its
+   own preview URL automatically on each push.
+
+Or from the CLI:
+
+```bash
+npm i -g vercel
+vercel          # preview deploy
+vercel --prod   # production deploy
+```
+
+### GitHub Pages (free alternative)
+
+A workflow (`.github/workflows/deploy-pages.yml`) publishes the site on every
+push to `main`. To turn it on once:
+
+1. Repo **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+2. Merge to `main` (or run the workflow manually via the Actions tab).
+
+The site then lives at `https://<your-user>.github.io/<repo>/`. All asset paths
+are relative, so it works correctly under that sub-path.

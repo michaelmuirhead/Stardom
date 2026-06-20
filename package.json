@@ -1,0 +1,17 @@
+{
+  "name": "stardom",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Stardom — a browser-based aspiring-actor career simulation game.",
+  "type": "module",
+  "scripts": {
+    "dev": "npx --yes serve@latest -l 8000 .",
+    "start": "npm run dev",
+    "check": "node --check js/data.js && node --check js/state.js && node --check js/engine.js && node --check js/ui.js && node --check js/main.js",
+    "test": "node scripts/smoke-test.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}
