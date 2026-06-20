@@ -9,6 +9,16 @@ import { pushLog, refreshOffers } from './state.js';
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const rf = (a, b) => a + Math.random() * (b - a);
 
+// Early-career fame friction: when nobody knows you, each small win barely moves
+// the needle; once you're recognized, fame compounds. Ramps ~0.30x at fame 0 up
+// to full effect around fame 35, so it only slows the early grind. Penalties
+// (negative deltas) are never scaled.
+function fameFriction(fame) { return clamp(0.24 + (fame / 42) * 0.76, 0.24, 1); }
+function gainFame(s, amt) {
+  const delta = amt > 0 ? amt * fameFriction(s.fame) : amt;
+  s.fame = clamp(+(s.fame + delta).toFixed(1), 0, 100);
+}
+
 // ---- Difficulty / genre helpers -------------------------------------------
 export function diffOf(s) { return DIFFICULTIES[s.difficulty] || DIFFICULTIES.normal; }
 
@@ -139,7 +149,7 @@ function bondWithCostars(s, costars) {
     if (!s.partner && !c.romance && c.rel > 55 && Math.random() < 0.2) {
       c.romance = true;
       s.partner = c.id;
-      s.fame = clamp(s.fame + 3, 0, 100);
+      gainFame(s, 3);
       pushLog(s, `💞 On-set sparks: you and ${c.name} are now an item! The press loves it. +3 fame.`);
     }
   }
@@ -202,7 +212,7 @@ function endSeason(s) {
   const taper = Math.max(0.5, 1 - (sh.season - 1) * 0.08);
   const fg = +(sh.fameGain * taper).toFixed(1);
   const sg = +(sh.skillGain * taper).toFixed(1);
-  s.fame = clamp(+(s.fame + fg).toFixed(1), 0, 100);
+  gainFame(s, fg);
   s.acting = clamp(+(s.acting + sg).toFixed(1), 0, 100);
   s.reputation = clamp(s.reputation + sh.prestige, 0, 100);
   s.yearPrestige += sh.prestige;
@@ -275,7 +285,7 @@ export function network(s) {
   let msg = `Networked at an industry party. +${rep.toFixed(1)} reputation.`;
   // Chance of an extra offer popping up.
   if (Math.random() < 0.4) {
-    s.offers.push(makeRole(s.fame));
+    s.offers.push(makeRole(s.fame, !s.hasAgent));
     msg += ' A new audition opened up!';
   }
   pushLog(s, `🥂 ${msg}`);
@@ -325,24 +335,47 @@ export function extraWork(s) {
   }
   // Rare: you actually make the final cut, for a sliver of fame.
   if (Math.random() < 0.06) {
-    s.fame = clamp(+(s.fame + 0.5).toFixed(1), 0, 100);
+    gainFame(s, 0.5);
     msg += ' You made the final cut! +0.5 fame.';
   }
   pushLog(s, `🎬 ${msg}`);
   return { ok: true, msg: `Earned $${pay} on set.` };
 }
 
+// Signing an agent is the early-game graduation: it takes a real body of work,
+// not just a viral moment. Once signed, the casting board opens up to the bigger
+// roles (studio films, series-regular TV) that open calls never offer.
+export const AGENT_FAME_REQ = 18;
+export const AGENT_CREDITS_REQ = 3;
+
+export function agentReady(s) {
+  const credits = s.filmography.length;
+  return {
+    credits,
+    needFame: AGENT_FAME_REQ,
+    needCredits: AGENT_CREDITS_REQ,
+    met: s.fame >= AGENT_FAME_REQ && credits >= AGENT_CREDITS_REQ,
+  };
+}
+
 export function toggleAgent(s) {
   if (s.gameOver) return { ok: false, msg: 'The game is over.' };
   if (!s.hasAgent) {
-    if (s.fame < 12) return { ok: false, msg: 'No agent will sign you yet. Reach 12 fame.' };
+    const req = agentReady(s);
+    if (!req.met) {
+      return {
+        ok: false,
+        msg: `No agent will sign you yet — need ${AGENT_FAME_REQ} fame & ${AGENT_CREDITS_REQ} credits (you have ${Math.floor(s.fame)} fame, ${req.credits} credit${req.credits === 1 ? '' : 's'}).`,
+      };
+    }
     s.hasAgent = true;
-    pushLog(s, '🕴️ You signed with a talent agent! Better auditions, but they take a cut.');
+    pushLog(s, '🕴️ You signed with a talent agent! The big auditions — studio films, series regular roles — are open to you now. They take a cut, but it\'s worth it.');
     refreshOffers(s);
-    return { ok: true, msg: 'Signed with an agent.' };
+    return { ok: true, msg: 'Signed with an agent! The real auditions begin.' };
   }
   s.hasAgent = false;
-  pushLog(s, '👋 You parted ways with your agent.');
+  pushLog(s, '👋 You parted ways with your agent. Back to open calls.');
+  refreshOffers(s);
   return { ok: true, msg: 'Dropped your agent.' };
 }
 
@@ -427,7 +460,7 @@ function wrapProduction(s, prod) {
   const profit = gross - prod.cost;
   s.money += gross;
   const fameGain = +(q / 100 * 6 * Math.sqrt(prod.scale)).toFixed(1);
-  s.fame = clamp(+(s.fame + fameGain).toFixed(1), 0, 100);
+  gainFame(s, fameGain);
   const prestige = +(q / 100 * (prod.directed ? 2 : 1.2) * Math.sqrt(prod.scale)).toFixed(2);
   s.yearPrestige += prestige;
   s.reputation = clamp(s.reputation + q / 25, 0, 100);
@@ -461,7 +494,7 @@ function rollEvents(s) {
 function applyDelta(s, d) {
   if (!d) return;
   if (d.money) s.money += d.money;
-  if (d.fame) s.fame = clamp(+(s.fame + d.fame).toFixed(1), 0, 100);
+  if (d.fame) gainFame(s, d.fame);
   if (d.acting) s.acting = clamp(+(s.acting + d.acting).toFixed(1), 0, 100);
   if (d.reputation) s.reputation = clamp(+(s.reputation + d.reputation).toFixed(1), 0, 100);
   if (d.energyPenalty) s.energyPenalty = (s.energyPenalty || 0) + d.energyPenalty;
@@ -478,11 +511,11 @@ function awardSeason(s) {
       const recent = s.filmography[s.filmography.length - 1];
       const award = { name: AWARD_NAME, year: s.year, project: recent ? recent.title : 'your work' };
       s.awards.push(award);
-      s.fame = clamp(s.fame + 8, 0, 100);
+      gainFame(s, 8);
       s.reputation = clamp(s.reputation + 12, 0, 100);
       pushLog(s, `🏆 You WON the ${AWARD_NAME} for ${award.project}! Your career soars. +8 fame.`);
     } else {
-      s.fame = clamp(s.fame + 3, 0, 100);
+      gainFame(s, 3);
       pushLog(s, `🎟️ You were nominated for a ${AWARD_NAME} but didn't win. Still, exposure! +3 fame.`);
     }
   }
@@ -510,7 +543,7 @@ export function advanceWeek(s) {
       const starPower = bondWithCostars(s, a.costars || []);
       const rubOff = +(starPower * 0.04).toFixed(1);
       const fameGain = +(a.role.fameGain + rubOff).toFixed(1);
-      s.fame = clamp(+(s.fame + fameGain).toFixed(1), 0, 100);
+      gainFame(s, fameGain);
       s.acting = clamp(+(s.acting + a.role.skillGain).toFixed(1), 0, 100);
       s.reputation = clamp(s.reputation + a.role.prestige * 2, 0, 100);
       s.yearPrestige += a.role.prestige;

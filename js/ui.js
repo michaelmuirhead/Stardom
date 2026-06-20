@@ -3,7 +3,7 @@ import { CLASSES, GENRES, GENRE_KEYS, fameTier, AWARD_NAME } from './data.js';
 import {
   audition, auditionChance, takeClass, network, rest, sideJob, extraWork, toggleAgent,
   writeScript, sellScript, startProduction, advanceWeek, isBusy, BUDGET_TIERS,
-  catchUp, quitSeries, specialty, diffOf,
+  catchUp, quitSeries, specialty, diffOf, agentReady, AGENT_FAME_REQ, AGENT_CREDITS_REQ,
 } from './engine.js';
 
 let S = null;        // current game state
@@ -141,14 +141,26 @@ function auditionsView() {
   quick.appendChild(actionBtn('🍽️ Side job (+$)', () => act(sideJob(S)), S.energy < 20));
   quick.appendChild(actionBtn('😴 Rest (+energy)', () => act(rest(S))));
   quick.appendChild(actionBtn('🥂 Network (+rep)', () => act(network(S)), S.energy < 15));
+  const aReq = agentReady(S);
   quick.appendChild(actionBtn(
-    S.hasAgent ? '👋 Drop agent' : '🕴️ Get agent',
+    S.hasAgent ? '👋 Drop agent' : '🕴️ Sign an agent',
     () => act(toggleAgent(S)),
-    !S.hasAgent && S.fame < 12,
+    !S.hasAgent && !aReq.met,
   ));
   wrap.appendChild(quick);
 
-  wrap.appendChild(el('h2', null, 'Casting Board'));
+  // Early-game direction: progress toward representation.
+  if (!S.hasAgent) {
+    const fameOk = S.fame >= AGENT_FAME_REQ;
+    const credOk = aReq.credits >= AGENT_CREDITS_REQ;
+    const tip = el('div', 'agent-goal');
+    tip.innerHTML = `🕴️ <b>Goal: land an agent</b> — they unlock studio films & series TV.
+      <span class="${fameOk ? 'good' : 'bad'}">Fame ${Math.floor(S.fame)}/${AGENT_FAME_REQ}</span> ·
+      <span class="${credOk ? 'good' : 'bad'}">Credits ${aReq.credits}/${AGENT_CREDITS_REQ}</span>`;
+    wrap.appendChild(tip);
+  }
+
+  wrap.appendChild(el('h2', null, S.hasAgent ? 'Casting Board' : 'Open Calls'));
   if (isBusy(S)) {
     wrap.appendChild(el('p', 'muted', 'You\'re committed to a project — finish it before taking new acting roles. Advance the week to make progress.'));
     return wrap;
@@ -171,7 +183,7 @@ function roleCard(r) {
     ${r.callback ? '<div class="badge">📞 Callback — they liked you</div>' : ''}
     <div class="card-head"><span class="card-ic">${r.icon}</span>
       <div><div class="card-title">${r.title}</div>
-      <div class="muted small">${r.genreIcon} ${r.genreName} ${r.catName} · ${r.part}</div></div></div>
+      <div class="muted small">${r.genreIcon} ${r.genreName} ${r.catName} · ${r.part}${r.openCall ? ' · 📭 open call' : ''}</div></div></div>
     <div class="reqs">
       <span>💵 ${money(r.pay)}</span>
       <span>⭐ +${r.fameGain}</span>

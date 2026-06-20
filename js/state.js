@@ -46,7 +46,7 @@ function structuredCloneSafe(o) {
 
 export function refreshOffers(s) {
   const count = 4 + (s.hasAgent ? 2 : 0);
-  s.offers = Array.from({ length: count }, () => makeRole(s.fame));
+  s.offers = Array.from({ length: count }, () => makeRole(s.fame, !s.hasAgent));
 }
 
 export function pushLog(s, msg) {

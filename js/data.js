@@ -107,21 +107,28 @@ export function fullName() {
 }
 
 // Generate a single audition offer scaled to player fame.
-export function makeRole(playerFame) {
-  const keys = Object.keys(CATEGORIES);
+// Roles an actor can reach without representation: smaller, lower-paid gigs.
+// Studio films and series-regular TV roles only come through an agent.
+export const OPEN_CALL_CATS = ['commercial', 'tvmovie', 'indie'];
+
+export function makeRole(playerFame, openCall = false) {
+  const keys = openCall ? OPEN_CALL_CATS : Object.keys(CATEGORIES);
   // Bias category selection by what the player can plausibly reach.
   const cat = CATEGORIES[pick(keys)];
   // tier 0..2 (small/medium/large within category), gated softly by fame.
-  const tier = Math.min(2, Math.max(0, Math.round(rf(-0.4, 2.2) * (0.5 + playerFame / 100))));
+  let tier = Math.min(2, Math.max(0, Math.round(rf(-0.4, 2.2) * (0.5 + playerFame / 100))));
+  if (openCall) tier = Math.min(tier, 1);  // no marquee parts at open calls
   const mult = [0.7, 1.1, 1.8][tier];
+  // Open-call gigs (student films, local spots, day players) pay & profile less.
+  const disc = openCall ? 0.7 : 1;
 
   const skillReq = Math.round(cat.skillBase * 4 + tier * 9 + rf(-3, 5));
   const fameReq = Math.round(cat.fameBase * 1.2 + tier * 6 + rf(-2, 4));
-  const pay = Math.round(cat.payBase * mult * rf(0.8, 1.3));
-  const fameGain = +(cat.fameBase * mult * rf(0.8, 1.25)).toFixed(1);
+  const pay = Math.round(cat.payBase * mult * rf(0.8, 1.3) * disc);
+  const fameGain = +(cat.fameBase * mult * rf(0.8, 1.25) * disc).toFixed(1);
   const skillGain = +(cat.skillBase * rf(0.8, 1.4) + tier * 0.6).toFixed(1);
   const weeks = cat.weeks[tier];
-  const prestige = +(cat.prestige * mult * rf(0.7, 1.2)).toFixed(2);
+  const prestige = +(cat.prestige * mult * rf(0.7, 1.2) * disc).toFixed(2);
   const genre = pick(GENRE_KEYS);
 
   return {
@@ -131,6 +138,7 @@ export function makeRole(playerFame) {
     catName: cat.name,
     icon: cat.icon,
     part: pick(PART),
+    openCall,
     genre,
     genreName: GENRES[genre].name,
     genreIcon: GENRES[genre].icon,

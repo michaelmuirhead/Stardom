@@ -48,13 +48,19 @@ Your odds depend on your **acting skill**, **fame**, **reputation**, and whether
 you have an **agent**. Land a role and you're in production for several weeks,
 earning pay and—on wrap—fame, skill, and prestige.
 
-**Starting out (the grind).** Every audition teaches you something — you gain a
-little acting craft win *or* lose. A near-miss earns a **📞 callback**: the role
-stays on the board with better odds next time instead of vanishing. When there's
-no role worth chasing, take **🎬 extra work** — background gigs that barely cover
-rent but build craft on-theme and occasionally introduce you to people on set.
-Side jobs remain the pure-cash safety net. The early game is a real climb:
-expect to scrape by for a while before you book enough to attract an agent.
+**Starting out (the grind).** Without representation you only see **Open Calls** —
+smaller, lower-paid commercials, TV movies, and indie films. Every audition
+teaches you something — you gain a little acting craft win *or* lose. A near-miss
+earns a **📞 callback**: the role stays on the board with better odds next time
+instead of vanishing. When there's no role worth chasing, take **🎬 extra work** —
+background gigs that roughly cover rent while building craft on-theme and
+occasionally introducing you to people on set. Side jobs remain the pure-cash net.
+
+**Signing an agent** is the early-game graduation. It takes a real body of work —
+**18 fame and 3 credits** — and unlocks the full casting board: studio films and
+series-regular TV roles that open calls never offer (the agent takes a 12% cut in
+return). Reaching it is a genuine climb of roughly a year of scraping by; fame
+comes slowly while you're an unknown and compounds once you're recognized.
 
 **Genre specialization.** Every role has a genre (🎭 Drama, 😂 Comedy, 💥 Action,
 👻 Horror, 🚀 Sci-Fi, 💖 Romance). The more you work in a genre, the better your

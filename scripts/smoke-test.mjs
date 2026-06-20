@@ -79,6 +79,30 @@ function playCareer(diffKey, weeks) {
   return { s, seen };
 }
 
+// A focused early-game burst that auditions heavily, to reliably exercise the
+// callback mechanic (which depends on near-miss losses over many attempts).
+function exerciseEarly() {
+  const s = newGame('Rookie', 'normal');
+  let callbacks = 0, auditioned = 0;
+  for (let i = 0; i < 160 && !s.gameOver; i++) {
+    checkIntegrity(s, `early wk${i}`);
+    if (s.energy < 20) { rest(s); advanceWeek(s); continue; }
+    if (!isBusy(s) && s.offers.length) {
+      const r = audition(s, s.offers[0].id);
+      auditioned++;
+      if (r.callback) callbacks++;
+    } else if (!isBusy(s)) {
+      network(s);
+    } else {
+      // committed to a project — just let it play out
+    }
+    advanceWeek(s);
+  }
+  // Pre-agent, the board must only show open-call roles.
+  const preAgentBoardOk = !s.hasAgent ? s.offers.every((o) => o.openCall) : true;
+  return { callbacks, auditioned, preAgentBoardOk, hasAgent: s.hasAgent };
+}
+
 console.log('Stardom engine smoke test\n');
 
 // 1) Difficulty config sanity
@@ -112,7 +136,12 @@ assert(agg.renewal, 'TV series renewals occurred');
 assert(agg.cancellation, 'TV series cancellations occurred');
 assert(agg.romance, 'co-star romance system engaged');
 assert(agg.extra, 'extra/background work was performed');
-assert(agg.callback, 'audition callbacks occurred');
+
+// 4) Early-game mechanics: callbacks + open-call board gating
+const early = exerciseEarly();
+console.log(`  early burst: ${early.auditioned} auditions, ${early.callbacks} callbacks`);
+assert(early.callbacks > 0, 'audition callbacks occurred in early-game burst');
+assert(early.preAgentBoardOk, 'pre-agent board only shows open-call roles');
 
 console.log('');
 if (failures) {
