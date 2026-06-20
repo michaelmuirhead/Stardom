@@ -423,6 +423,33 @@ export const BUDGET_TIERS = [
   { key: 'big', name: 'Blockbuster', cost: 120000, scale: 16 },
 ];
 
+// Quality of a production before luck — shared by the wrap logic and the UI
+// preview so they can never drift apart.
+function prodQualityBase(scriptQuality, producing, directing, directed) {
+  let base = scriptQuality * 0.5 + producing * 0.3;
+  if (directed) base += directing * 0.25;
+  return base;
+}
+
+// Pure projection the UI shows before you greenlight (ignores luck swings).
+export function estimateProduction(s, { budgetKey, scriptId, direct }) {
+  const tier = BUDGET_TIERS.find((b) => b.key === budgetKey);
+  if (!tier) return null;
+  const script = scriptId ? s.scripts.find((x) => x.id === scriptId) : null;
+  const sq = script ? script.quality : 35;
+  const base = prodQualityBase(sq, s.producing, s.directing, !!(direct && s.directing >= 5));
+  const ql = Math.round(clamp(base * 0.6, 5, 100));
+  const qe = Math.round(clamp(base * 0.925, 5, 100));
+  const qh = Math.round(clamp(base * 1.25, 5, 100));
+  const grossAt = (q) => Math.round(tier.cost * (0.4 + (q / 100) * 2.4));
+  return {
+    cost: tier.cost,
+    affordable: s.money >= tier.cost,
+    qLow: ql, qExp: qe, qHigh: qh,
+    grossExp: grossAt(qe),
+  };
+}
+
 export function startProduction(s, { budgetKey, scriptId, direct }) {
   if (s.gameOver) return { ok: false, msg: 'The game is over.' };
   if (s.producing < 5) return { ok: false, msg: 'Take a producing bootcamp first.' };
@@ -461,9 +488,7 @@ export function startProduction(s, { budgetKey, scriptId, direct }) {
 
 function wrapProduction(s, prod) {
   // Quality blends script, your producing/directing skill, and luck.
-  let q = prod.scriptQuality * 0.5 + s.producing * 0.3;
-  if (prod.directed) q += s.directing * 0.25;
-  q *= rf(0.6, 1.25);
+  let q = prodQualityBase(prod.scriptQuality, s.producing, s.directing, prod.directed) * rf(0.6, 1.25);
   q = clamp(q, 5, 100);
 
   // Box office return scales with budget tier & quality.

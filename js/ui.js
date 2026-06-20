@@ -2,7 +2,7 @@
 import { CLASSES, GENRES, GENRE_KEYS, fameTier, AWARD_NAME } from './data.js';
 import {
   audition, auditionChance, takeClass, network, rest, sideJob, extraWork, toggleAgent,
-  writeScript, sellScript, startProduction, advanceWeek, isBusy, BUDGET_TIERS,
+  writeScript, sellScript, startProduction, estimateProduction, advanceWeek, isBusy, BUDGET_TIERS,
   catchUp, quitSeries, specialty, diffOf, agentReady, AGENT_FAME_REQ, AGENT_CREDITS_REQ,
 } from './engine.js';
 
@@ -249,7 +249,7 @@ function createView() {
       const card = el('div', 'card');
       card.innerHTML = `<div class="card-title">📄 ${sc.title}</div>
         <div class="muted small">${sc.genreIcon ? sc.genreIcon + ' ' + sc.genreName + ' · ' : ''}Quality ${sc.quality}</div>`;
-      card.appendChild(actionBtn('💰 Sell to studio', () => act(sellScript(S, sc.id))));
+      card.appendChild(actionBtn(`💰 Sell to studio (~${money(sc.quality * 220)})`, () => act(sellScript(S, sc.id))));
       grid.appendChild(card);
     }
     wrap.appendChild(grid);
@@ -295,16 +295,38 @@ function producerForm() {
   const dirBox = document.createElement('input');
   dirBox.type = 'checkbox';
   dirBox.disabled = S.directing < 5;
-  dirBox.onchange = () => { state.direct = dirBox.checked; };
+  dirBox.onchange = () => { state.direct = dirBox.checked; update(); };
   dirLabel.appendChild(dirBox);
   dirLabel.appendChild(document.createTextNode(
     S.directing < 5 ? ' Also direct (needs directing 5+)' : ' Also direct it (+prestige)'));
 
+  // Live projection + affordability-gated greenlight
+  const preview = el('div', 'estimate');
+  const go = el('button', 'btn primary', '🎬 Greenlight production');
+  go.onclick = () => act(startProduction(S, state));
+  bSel.onchange = () => { state.budgetKey = bSel.value; update(); };
+  sSel.onchange = () => { state.scriptId = sSel.value; update(); };
+
+  function update() {
+    const est = estimateProduction(S, state);
+    if (!est) { preview.innerHTML = ''; return; }
+    const profit = est.grossExp - est.cost;
+    go.disabled = !est.affordable;
+    preview.innerHTML = `
+      <div class="est-row"><span>Projected quality</span><span>${est.qLow}–${est.qHigh} <span class="muted">(~${est.qExp})</span></span></div>
+      <div class="est-row"><span>Budget</span><span>${money(est.cost)}</span></div>
+      <div class="est-row"><span>Projected box office</span><span>~${money(est.grossExp)}</span></div>
+      <div class="est-row ${profit >= 0 ? 'good' : 'bad'}"><span>Projected profit</span><span>${profit >= 0 ? '+' : ''}${money(profit)}</span></div>
+      ${est.affordable ? '' : '<div class="bad small">You can\'t afford this budget yet.</div>'}`;
+  }
+
   block.appendChild(labeled('Budget', bSel));
   block.appendChild(labeled('Script', sSel));
   block.appendChild(dirLabel);
-  block.appendChild(actionBtn('🎬 Greenlight production', () => act(startProduction(S, state))));
-  block.appendChild(el('p', 'muted small', 'Producing ties up no energy but locks in your money. Quality (and box office) depend on your script, producing skill, and—if you direct—your directing skill. Each production also builds your affinity in its genre.'));
+  block.appendChild(preview);
+  block.appendChild(go);
+  block.appendChild(el('p', 'muted small', 'Producing ties up no energy but locks in your money. Projections ignore luck — actual results swing higher or lower. Each production also builds your affinity in its genre.'));
+  update();
   return block;
 }
 
@@ -408,7 +430,7 @@ function careerView() {
   else {
     const ul = el('ul', 'list');
     for (const f of [...S.filmography].reverse()) {
-      ul.appendChild(el('li', null, `<b>${f.title}</b> — ${f.role} <span class="muted">(${f.category}, Yr ${f.year})</span>`));
+      ul.appendChild(el('li', null, `<b>${f.title}</b> — ${f.role} <span class="muted">(${f.genre ? f.genre + ' ' : ''}${f.category}, Yr ${f.year})</span>${f.quality != null ? ` <span class="qchip">★ ${f.quality}</span>` : ''}`));
     }
     wrap.appendChild(ul);
   }

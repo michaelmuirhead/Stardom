@@ -182,6 +182,20 @@ main {
 }
 .check { display: flex; align-items: center; gap: 8px; margin: 8px 0 14px; color: var(--txt); }
 
+/* Production projection */
+.estimate {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 10px; padding: 10px 14px; margin: 4px 0 14px;
+}
+.est-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 14px; }
+.est-row.good span:last-child { color: var(--good); font-weight: 700; }
+.est-row.bad span:last-child { color: var(--bad); font-weight: 700; }
+
+.qchip {
+  font-size: 11px; font-weight: 700; color: var(--gold2);
+  background: #2a2718; border: 1px solid var(--line); border-radius: 999px; padding: 1px 7px;
+}
+
 /* ---- Log ---- */
 .log {
   background: var(--panel); border: 1px solid var(--line);
