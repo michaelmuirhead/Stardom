@@ -377,6 +377,24 @@ function startSeries(s, role, costars) {
   s.stats.seasons++;
 }
 
+// Push for a bigger raise on a just-renewed series. A hit gives you leverage;
+// fame, reputation and an agent help. One shot per renewal.
+export function negotiateRenewal(s) {
+  const sh = s.activeSeries;
+  if (!sh || !sh.pendingRenewal) return { ok: false, msg: 'Nothing to renegotiate.' };
+  sh.pendingRenewal = false;
+  const chance = clamp(0.3 + sh.ratings / 200 + s.reputation / 250 + s.fame / 300 + (s.hasAgent ? 0.2 : 0), 0.1, 0.95);
+  if (Math.random() < chance) {
+    const bump = rf(0.15, 0.45);
+    sh.salary = Math.round(sh.salary * (1 + bump));
+    pushLog(s, `🤝 You renegotiated your "${sh.title}" deal — salary up ${Math.round(bump * 100)}% to $${sh.salary.toLocaleString()}/season.`);
+    return { ok: true, msg: `Salary bumped ${Math.round(bump * 100)}%!`, salary: sh.salary };
+  }
+  s.reputation = clamp(s.reputation - rf(0, 2), 0, 100);
+  pushLog(s, `😐 The studio held firm on your "${sh.title}" salary.`);
+  return { ok: false, msg: 'They held firm on the offer.' };
+}
+
 export function quitSeries(s) {
   if (!s.activeSeries) return { ok: false, msg: 'You\'re not on a series.' };
   const sh = s.activeSeries;
@@ -418,19 +436,25 @@ function endSeason(s) {
   grantRoyalty(s, `${sh.title} S${seasonNo}`, { type: 'views', value: viewers }, 'lead');
 
   if (Math.random() < renewChance) {
+    // Market raise scales with the show's success — a hit explodes your fee.
+    const oldSalary = sh.salary;
+    const growth = 1 + 0.1 + (sh.ratings / 100) * 0.6;
     sh.season++;
-    sh.salary = Math.round(sh.salary * 1.12);  // raises each season
+    sh.salary = Math.round(sh.salary * growth);
     sh.weeksLeft = SERIES_SEASON_WEEKS;
     sh.totalWeeks = SERIES_SEASON_WEEKS;
     sh.prep = 0;                                // fresh prep each season
     sh.status = 'filming';
+    sh.pendingRenewal = true;                   // you may renegotiate this offer
     s.stats.seasons++;
-    pushLog(s, `📈 "${sh.title}" was RENEWED for season ${sh.season}! (${sh.ratings} rating, +12% pay). +${fg} fame.`);
+    const raisePct = Math.round((sh.salary / oldSalary - 1) * 100);
+    pushLog(s, `📈 "${sh.title}" was RENEWED for season ${sh.season}! (${sh.ratings} rating, +${raisePct}% to $${sh.salary.toLocaleString()}/season). +${fg} fame.`);
     s.releaseNight = {
       title: sh.title, icon: '📡', category: `TV Series · Season ${seasonNo}`,
       role: sh.part, genre: sh.genreName, quality: sh.ratings, reception: rec.label, emoji: rec.emoji,
       result: { type: 'views', value: viewers }, rating: sh.ratings, verdict: `Renewed for Season ${sh.season}`,
       fameGain: fg, costars: (sh.costars || []).map((c) => c.name),
+      renewalOffer: { salary: sh.salary, raisePct },
     };
   } else {
     // Cancellation: a long run earns a prestigious finale.

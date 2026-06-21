@@ -5,7 +5,7 @@ import {
   writeScript, sellScript, startProduction, estimateProduction, advanceWeek, isBusy, BUDGET_TIERS,
   catchUp, quitSeries, specialty, diffOf, agentReady, AGENT_FAME_REQ, AGENT_CREDITS_REQ,
   retire, careerLegacy, checkMilestones, typecastInfo, negotiate, resolveChoice,
-  buyAsset, ownedAssets, prepareRole,
+  buyAsset, ownedAssets, prepareRole, negotiateRenewal,
 } from './engine.js';
 
 let S = null;        // current game state
@@ -763,6 +763,7 @@ function buildReleaseModal() {
   if (r.rating != null) html += row('Rating', `${r.rating}/100`);
   if (r.quality != null) html += row('Your performance', `${r.quality}/100`);
   if (r.profit != null) html += row('Profit', `${r.profit >= 0 ? '+' : ''}${money(r.profit)}`, r.profit >= 0 ? 'good' : 'bad');
+  if (r.renewalOffer) html += row('New salary offer', `${bigMoney(r.renewalOffer.salary)}/season (+${r.renewalOffer.raisePct}%)`, 'good');
   if (r.fameGain != null) html += row('Fame gained', `+${r.fameGain}`);
   rows.innerHTML = html;
   card.appendChild(rows);
@@ -773,14 +774,27 @@ function buildReleaseModal() {
     card.appendChild(el('p', 'muted small', `Starring you, with ${r.costars.slice(0, 3).join(', ')}`));
   }
 
-  const btn = actionBtn('Continue', () => {
-    S.releaseNight = null;
-    if (onMutate) onMutate(S);
-    overlay.remove();
-    render();
-  });
-  btn.classList.add('primary');
-  card.appendChild(btn);
+  const close = () => { S.releaseNight = null; if (onMutate) onMutate(S); overlay.remove(); render(); };
+
+  if (r.renewalOffer && S.activeSeries && S.activeSeries.pendingRenewal) {
+    const row = el('div', 'card-actions');
+    const accept = actionBtn('Accept offer', close); accept.classList.add('primary');
+    const haggle = actionBtn('🤝 Push for more', () => {
+      const res = negotiateRenewal(S);
+      // Re-render the modal body to show the outcome, then Continue.
+      rows.innerHTML += `<div class="est-row ${res.ok ? 'good' : 'bad'}"><span>Renegotiation</span><span>${res.msg}</span></div>`;
+      row.remove();
+      const cont = actionBtn('Continue', close); cont.classList.add('primary');
+      card.appendChild(cont);
+    });
+    row.appendChild(haggle);
+    row.appendChild(accept);
+    card.appendChild(row);
+  } else {
+    const btn = actionBtn('Continue', close);
+    btn.classList.add('primary');
+    card.appendChild(btn);
+  }
 }
 
 function modalShell() {
