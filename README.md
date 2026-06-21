@@ -20,6 +20,18 @@ Enter a stage name (or leave blank for a random one), pick a **difficulty**,
 and start your career. Progress autosaves to your browser — use **Continue**
 to resume.
 
+### Install on your phone (PWA)
+
+Stardom is an installable Progressive Web App with offline support. On a
+deployed (HTTPS) build:
+
+- **iPhone/iPad (Safari):** tap **Share → Add to Home Screen**. It launches
+  full-screen with its own icon, no browser chrome.
+- **Android (Chrome):** use the **Install app** prompt / menu item.
+
+A service worker caches the app shell so it keeps working offline, and your
+career is saved locally on the device.
+
 ### Difficulty
 
 | Mode | Start $ | Weekly cost | Pay | Audition odds | Bankruptcy at |
@@ -55,6 +67,14 @@ earning pay and—on wrap—fame, skill, and prestige.
 small supporting parts; leading roles open up as your fame grows, and they pay
 and profile far more. Billing also gates awards — only supporting and lead
 performances qualify (a cameo never wins an Oscar).
+
+**Performance, rehearsal & reception.** While filming, you can **🎭 rehearse**
+(up to 4 sessions) to sharpen the role. When the project wraps, your **performance
+quality** — driven mainly by your acting skill, plus genre comfort, rehearsal, and
+the material — determines its **reception**: 📉 Flop, ➖ Mixed, 👍 Hit, or 🌟 Smash
+Hit. Hits boost your fame and reputation; flops set you back. Great work also makes
+the credit a real awards contender. Long shoots also throw the occasional **on-set
+dilemma** (an extra take, your own stunt, an improv idea, friction with a co-star).
 
 **Starting out (the grind).** Without representation you only see **Open Calls** —
 smaller, lower-paid commercials, TV movies, and indie films. Every audition
@@ -129,6 +149,10 @@ and producing (which unlock as your fame grows).
 - 🎬 **Produce** films at micro / mid / blockbuster budgets. Box office depends
   on script quality, your producing skill, and—if you also **direct**—your
   directing skill. Each production also builds your affinity in its genre.
+- ⭐ **Star in your own film** — check "Star in it" to play the lead in a project
+  you write, direct, and produce. The full-auteur credit is eligible for Best
+  Actor, Director, Picture *and* Original Screenplay, and you can rehearse it
+  like any role.
 
 **Awards season** runs through the calendar with four real ceremonies, each
 judging your eligible credits from the trailing year:

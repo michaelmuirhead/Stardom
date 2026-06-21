@@ -67,3 +67,10 @@ window.addEventListener('DOMContentLoaded', () => {
   const saved = load();
   showStartScreen(!!saved);
 });
+
+// Register the service worker for offline play / installability.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => { /* offline support unavailable */ });
+  });
+}

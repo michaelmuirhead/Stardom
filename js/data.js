@@ -315,6 +315,57 @@ export const CHOICE_EVENTS = [
       { label: 'You\'re too busy', outcome: () => ({ msg: 'You politely decline. No one blames you... much.' }) },
     ],
   },
+  // ---- On-set dilemmas (only while filming) ----
+  {
+    id: 'extra_take', when: (s) => !!s.active || (s.activeSeries && s.activeSeries.status === 'filming'),
+    title: '🎬 One More Take',
+    text: 'The director isn\'t satisfied and wants the scene again — and it\'s getting late.',
+    options: [
+      { label: 'Nail it, however long it takes', outcome: () => ({ prep: 1, energy: -12, msg: 'You dig deep. The take is electric.' }) },
+      { label: 'Call it a day', outcome: () => ({ msg: 'You wrap on schedule. Fine is fine.' }) },
+    ],
+  },
+  {
+    id: 'own_stunt', when: (s) => !!s.active || (s.activeSeries && s.activeSeries.status === 'filming'),
+    title: '🤸 Do Your Own Stunt?',
+    text: 'A risky stunt could look incredible on camera — or land you in the ER.',
+    options: [
+      {
+        label: 'Do it yourself',
+        outcome: () => (Math.random() < 0.3
+          ? { energy: -30, msg: 'You tweak your back — ouch. Painful reshoots follow.' }
+          : { prep: 1, fame: rf(1, 3), energy: -10, msg: 'The stunt is jaw-dropping — it makes the trailer!' }),
+      },
+      { label: 'Use a stunt double', outcome: () => ({ msg: 'Safe and professional. The double nails it.' }) },
+    ],
+  },
+  {
+    id: 'set_friction',
+    when: (s) => {
+      const p = s.active || (s.activeSeries && s.activeSeries.status === 'filming' ? s.activeSeries : null);
+      return !!(p && (p.costars || []).length);
+    },
+    title: '😬 On-Set Friction',
+    text: 'You and a co-star aren\'t clicking, and it\'s showing up in the scenes.',
+    options: [
+      { label: 'Clear the air over dinner', outcome: () => ({ costarRel: 12, energy: -10, msg: 'You bond. The chemistry returns.' }) },
+      { label: 'Keep it strictly professional', outcome: () => ({ msg: 'You power through. The tension lingers in the cut.' }) },
+    ],
+  },
+  {
+    id: 'improv', when: (s) => !!s.active || (s.activeSeries && s.activeSeries.status === 'filming'),
+    title: '💡 Improv Moment',
+    text: 'You have an idea to improvise a line that isn\'t in the script.',
+    options: [
+      {
+        label: 'Go for it',
+        outcome: () => (Math.random() < 0.5
+          ? { prep: 1, acting: rf(0.5, 1.5), msg: 'The director loves it — it makes the final cut!' }
+          : { rep: -1, msg: 'It falls flat. Back to the script.' }),
+      },
+      { label: 'Stick to the script', outcome: () => ({ msg: 'You play it as written. Solid and safe.' }) },
+    ],
+  },
   {
     id: 'campaign', when: (s) => s.fame > 40 && s.money > 25000,
     title: '📣 Awards Campaign',

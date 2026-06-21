@@ -262,6 +262,12 @@ export function resolveChoice(s, idx) {
     const p = s.contacts.find((c) => c.id === s.partner);
     if (p) p.rel = clamp(p.rel + d.partnerRel, 0, 100);
   }
+  // On-set deltas: rehearsal prep for the current shoot, and co-star bonding.
+  const proj = s.active
+    || (s.activeSeries && s.activeSeries.status === 'filming' ? s.activeSeries : null)
+    || s.productions.find((p) => p.star && p.weeksLeft > 0);
+  if (d.prep && proj) proj.prep = clamp((proj.prep || 0) + d.prep, 0, 4);
+  if (d.costarRel && proj) for (const c of (proj.costars || [])) c.rel = clamp(c.rel + d.costarRel, 0, 100);
   if (d.msg) pushLog(s, `🎬 ${d.msg}`);
   return { ok: true, msg: d.msg || 'Decision made.' };
 }
@@ -366,9 +372,9 @@ function endSeason(s) {
   awardGenreXp(s, sh.genre, 2 + sh.prestige);
   const starPower = bondWithCostars(s, sh.costars);
 
-  // Ratings drive renewal: your fame & craft + co-star draw, minus fatigue.
+  // Ratings drive renewal: your fame & craft + co-star draw + rehearsal, minus fatigue.
   sh.ratings = Math.round(clamp(
-    s.fame * 0.5 + s.acting * 0.2 + starPower * 0.3 + rf(-8, 14) - (sh.season - 1) * 4,
+    s.fame * 0.5 + s.acting * 0.2 + starPower * 0.3 + (sh.prep || 0) * 3 + rf(-8, 14) - (sh.season - 1) * 4,
     5, 100,
   ));
   const renewChance = clamp(sh.ratings / 110 + diffOf(s).oddsBonus, 0.08, 0.93);
@@ -378,6 +384,7 @@ function endSeason(s) {
     sh.salary = Math.round(sh.salary * 1.12);  // raises each season
     sh.weeksLeft = SERIES_SEASON_WEEKS;
     sh.totalWeeks = SERIES_SEASON_WEEKS;
+    sh.prep = 0;                                // fresh prep each season
     sh.status = 'filming';
     s.stats.seasons++;
     pushLog(s, `📈 "${sh.title}" was RENEWED for season ${sh.season}! (${sh.ratings} rating, +12% pay). +${fg} fame.`);
@@ -588,12 +595,13 @@ function prodQualityBase(scriptQuality, producing, directing, directed) {
 }
 
 // Pure projection the UI shows before you greenlight (ignores luck swings).
-export function estimateProduction(s, { budgetKey, scriptId, direct }) {
+export function estimateProduction(s, { budgetKey, scriptId, direct, star }) {
   const tier = BUDGET_TIERS.find((b) => b.key === budgetKey);
   if (!tier) return null;
   const script = scriptId ? s.scripts.find((x) => x.id === scriptId) : null;
   const sq = script ? script.quality : 35;
-  const base = prodQualityBase(sq, s.producing, s.directing, !!(direct && s.directing >= 5));
+  let base = prodQualityBase(sq, s.producing, s.directing, !!(direct && s.directing >= 5));
+  if (star) base += s.acting * 0.2;
   const ql = Math.round(clamp(base * 0.6, 5, 100));
   const qe = Math.round(clamp(base * 0.925, 5, 100));
   const qh = Math.round(clamp(base * 1.25, 5, 100));
@@ -606,7 +614,7 @@ export function estimateProduction(s, { budgetKey, scriptId, direct }) {
   };
 }
 
-export function startProduction(s, { budgetKey, scriptId, direct }) {
+export function startProduction(s, { budgetKey, scriptId, direct, star }) {
   if (s.gameOver) return { ok: false, msg: 'The game is over.' };
   if (s.producing < 5) return { ok: false, msg: 'Take a producing bootcamp first.' };
   const tier = BUDGET_TIERS.find((b) => b.key === budgetKey);
@@ -631,6 +639,7 @@ export function startProduction(s, { budgetKey, scriptId, direct }) {
     scale: tier.scale,
     scriptQuality: script ? script.quality : 35,
     written: !!script,                 // produced from your own screenplay
+    star: !!star,                      // you cast yourself as the lead
     genre,
     genreName: GENRES[genre].name,
     genreIcon: GENRES[genre].icon,
@@ -638,15 +647,57 @@ export function startProduction(s, { budgetKey, scriptId, direct }) {
     weeksLeft: weeks,
     totalWeeks: weeks,
   };
+  if (star) prod.costars = castCostars(s);
   s.productions.push(prod);
-  pushLog(s, `🎬 You're producing ${prod.genreName} project "${prod.title}" (${tier.name})${direct ? ' and directing it' : ''}.`);
+  const hats = [star ? 'starring' : null, direct ? 'directing' : null].filter(Boolean).join(' & ');
+  pushLog(s, `🎬 You're producing ${prod.genreName} project "${prod.title}" (${tier.name})${hats ? ' and ' + hats : ''}.`);
   return { ok: true, msg: `Production started on "${prod.title}".` };
 }
 
+// ---- Performance & reception ----------------------------------------------
+// A role's on-screen quality is driven by your craft, genre comfort, how much
+// you prepared, the project's prestige, and your billing — plus luck.
+function performanceQuality(s, role, prep) {
+  const aff = clamp(genreAffinity(s, role.genre), 0, 40);
+  const billingBonus = role.billing === 'lead' ? 4 : role.billing === 'supporting' ? 2 : 0;
+  const material = Math.min(role.prestige || 0, 3) * 2.5; // good material helps, capped
+  // Your craft is the dominant factor; genre comfort, prep and material modify it.
+  const base = s.acting * 0.75 + aff * 0.15 + (prep || 0) * 5 + billingBonus + material;
+  return clamp(Math.round(base * rf(0.82, 1.15)), 5, 100);
+}
+
+// How the work lands with audiences/critics, from its quality (+ luck).
+function reception(quality) {
+  const score = quality + rf(-12, 12);
+  if (score < 35) return { label: 'Flop', fameMult: 0.6, rep: -2, emoji: '📉' };
+  if (score < 60) return { label: 'Mixed Reviews', fameMult: 1.0, rep: 0, emoji: '➖' };
+  if (score < 82) return { label: 'Hit', fameMult: 1.3, rep: 1, emoji: '👍' };
+  return { label: 'Smash Hit', fameMult: 1.6, rep: 3, emoji: '🌟' };
+}
+
+// Rehearse for the project you're currently filming to lift its performance.
+export function prepareRole(s) {
+  if (s.gameOver) return { ok: false, msg: 'The game is over.' };
+  const proj = s.active
+    || (s.activeSeries && s.activeSeries.status === 'filming' ? s.activeSeries : null)
+    || s.productions.find((p) => p.star && p.weeksLeft > 0);
+  if (!proj) return { ok: false, msg: 'You\'re not filming anything to prepare for.' };
+  if ((proj.prep || 0) >= 4) return { ok: false, msg: 'You\'re fully prepared for this role.' };
+  if (s.energy < 18) return { ok: false, msg: 'Too tired to rehearse. Rest first.' };
+  spendEnergy(s, 18);
+  proj.prep = (proj.prep || 0) + 1;
+  s.acting = clamp(+(s.acting + rf(0.1, 0.3)).toFixed(1), 0, 100);
+  const title = proj.role ? proj.role.title : proj.title;
+  pushLog(s, `🎭 You rehearsed for "${title}" (prep ${proj.prep}/4). Your performance will be stronger.`);
+  return { ok: true, msg: 'Rehearsed — performance improved.' };
+}
+
 function wrapProduction(s, prod) {
-  // Quality blends script, your producing/directing skill, and luck.
-  let q = prodQualityBase(prod.scriptQuality, s.producing, s.directing, prod.directed) * rf(0.6, 1.25);
-  q = clamp(q, 5, 100);
+  // Quality blends script, producing/directing skill (and your acting if you
+  // star), how prepared you were, and luck.
+  let base = prodQualityBase(prod.scriptQuality, s.producing, s.directing, prod.directed);
+  if (prod.star) base += s.acting * 0.2 + (prod.prep || 0) * 3;
+  const q = clamp(base * rf(0.6, 1.25), 5, 100);
 
   // Box office return scales with budget tier & quality.
   const gross = Math.round(prod.cost * (0.4 + (q / 100) * 2.4) * rf(0.7, 1.3));
@@ -660,18 +711,26 @@ function wrapProduction(s, prod) {
   if (prod.directed) s.directing = clamp(+(s.directing + 1).toFixed(1), 0, 100);
   s.producing = clamp(+(s.producing + 1).toFixed(1), 0, 100);
   awardGenreXp(s, prod.genre, 1 + prestige);
+  if (prod.star) {
+    s.acting = clamp(+(s.acting + 1).toFixed(1), 0, 100);
+    awardGenreXp(s, prod.genre, 1);
+    bondWithCostars(s, prod.costars || []);
+  }
 
   addCredit(s, {
     title: prod.title, category: 'Produced', genre: prod.genreName,
-    role: [prod.directed ? 'Director' : null, 'Producer', prod.written ? 'Writer' : null].filter(Boolean).join(' / '),
+    role: [prod.star ? 'Star' : null, prod.directed ? 'Director' : null, 'Producer', prod.written ? 'Writer' : null].filter(Boolean).join(' / '),
     produced: true, directed: prod.directed, written: !!prod.written,
+    acted: !!prod.star, billing: prod.star ? 'lead' : undefined, lead: !!prod.star,
+    costars: (prod.costars || []).map((c) => c.id),
     writeQuality: prod.scriptQuality, quality: Math.round(q),
+    reception: reception(q).label,
   });
 
   const verdict = profit > 0
-    ? `It grossed $${gross} — a $${profit} profit! 🍾`
-    : `It grossed $${gross} — a $${Math.abs(profit)} loss. 📉`;
-  pushLog(s, `🎞️ "${prod.title}" wrapped (quality ${Math.round(q)}). ${verdict} +${fameGain} fame.`);
+    ? `It grossed $${gross.toLocaleString()} — a $${profit.toLocaleString()} profit! 🍾`
+    : `It grossed $${gross.toLocaleString()} — a $${Math.abs(profit).toLocaleString()} loss. 📉`;
+  pushLog(s, `🎞️ "${prod.title}" wrapped (${reception(q).emoji} ${reception(q).label}, quality ${Math.round(q)}). ${verdict} +${fameGain} fame.`);
 }
 
 // ---- Random events ---------------------------------------------------------
@@ -768,13 +827,13 @@ function judgeCategory(s, credit, cat, cer) {
   const strength = workQuality * 0.55 + craft * 0.25 + s.reputation * 0.12 + s.fame * 0.08;
 
   // Nomination bar climbs with the ceremony's prestige (Oscars hardest).
-  const bar = 60 + cer.prestige * 11;
-  const nomChance = clamp((strength - bar) / 40, 0, 0.7);
+  const bar = 64 + cer.prestige * 12;
+  const nomChance = clamp((strength - bar) / 42, 0, 0.65);
   if (Math.random() >= nomChance) return { nominated: false, won: false };
 
   // Among five nominees, the best work is favored but upsets are common.
-  const edge = clamp((strength - bar) / 65, 0, 0.32);
-  const winChance = clamp(0.14 + edge, 0.07, 0.46);
+  const edge = clamp((strength - bar) / 70, 0, 0.30);
+  const winChance = clamp(0.12 + edge, 0.06, 0.42);
   return { nominated: true, won: Math.random() < winChance };
 }
 
@@ -900,13 +959,16 @@ export function advanceWeek(s) {
     earn(s, net);
     a.weeksLeft--;
     if (a.weeksLeft <= 0) {
-      // Wrap: bond with co-stars; their star power rubs off on your fame.
+      // Wrap: your performance quality + the project's reception shape the payoff.
       const starPower = bondWithCostars(s, a.costars || []);
       const rubOff = +(starPower * 0.04).toFixed(1);
-      const fameGain = +(a.role.fameGain + rubOff).toFixed(1);
+      const quality = performanceQuality(s, a.role, a.prep);
+      const isAd = creditMedium(a.role.catName) === 'other'; // commercials: no box office
+      const rec = isAd ? null : reception(quality);
+      const fameGain = +(a.role.fameGain * (rec ? rec.fameMult : 1) + rubOff).toFixed(1);
       gainFame(s, fameGain);
       s.acting = clamp(+(s.acting + a.role.skillGain).toFixed(1), 0, 100);
-      s.reputation = clamp(s.reputation + a.role.prestige * 2, 0, 100);
+      s.reputation = clamp(s.reputation + a.role.prestige * 2 + (rec ? rec.rep : 0), 0, 100);
       s.careerPrestige += a.role.prestige;
       awardGenreXp(s, a.role.genre, 1.5 + a.role.prestige);
       addCredit(s, {
@@ -915,10 +977,10 @@ export function advanceWeek(s) {
         acted: true, billing: a.role.billing || 'supporting',
         lead: a.role.billing === 'lead',
         costars: (a.costars || []).map((c) => c.id),
-        quality: Math.round(50 + a.role.prestige * 10),
+        quality, reception: rec ? rec.label : undefined,
       });
-      const rubMsg = rubOff > 0 ? ` (+${rubOff} from famous co-stars)` : '';
-      pushLog(s, `🎉 "${a.role.title}" wrapped! +${fameGain} fame${rubMsg}, +${a.role.skillGain} acting.`);
+      const recMsg = rec ? ` ${rec.emoji} ${rec.label} (quality ${quality}).` : '';
+      pushLog(s, `🎉 "${a.role.title}" wrapped!${recMsg} +${fameGain} fame, +${a.role.skillGain} acting.`);
       s.active = null;
     }
   }
