@@ -77,6 +77,16 @@ body {
 .diff-blurb { font-size: 12px; color: var(--muted); }
 
 /* ---- Layout ---- */
+/* Centered app column: full-bleed on laptops/tablets, capped on big monitors,
+   and a flex column so the footer anchors to the bottom on tall screens. */
+#game {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  max-width: 1360px;
+  margin: 0 auto;
+}
 header {
   display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
   padding: 12px 20px; background: var(--bg2); border-bottom: 1px solid var(--line);
@@ -117,8 +127,15 @@ header {
 main {
   display: grid; grid-template-columns: 1fr 320px; gap: 16px;
   padding: 16px 20px; align-items: start;
+  flex: 1; width: 100%;
 }
-@media (max-width: 880px) { main { grid-template-columns: 1fr; } }
+/* Single-column (iPad portrait & down): log becomes a normal block, not sticky */
+@media (max-width: 880px) {
+  main { grid-template-columns: 1fr; }
+  .log { position: static; top: auto; max-height: 360px; }
+}
+/* Roomier log column on large desktop monitors */
+@media (min-width: 1200px) { main { grid-template-columns: 1fr 360px; } }
 
 /* ---- Tabs ---- */
 .tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
