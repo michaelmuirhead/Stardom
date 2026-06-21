@@ -2,11 +2,11 @@
 // Runs full simulated careers across every difficulty and asserts the engine
 // stays internally consistent. Exits non-zero on any failure so CI can gate.
 import { newGame } from '../js/state.js';
-import { DIFFICULTIES, GENRE_KEYS } from '../js/data.js';
+import { DIFFICULTIES, GENRE_KEYS, makeRole, taxFor } from '../js/data.js';
 import {
   advanceWeek, audition, auditionChance, takeClass, network, rest, sideJob,
   extraWork, toggleAgent, writeScript, startProduction, isBusy, catchUp, quitSeries,
-  agentReady, negotiate, resolveChoice,
+  agentReady, negotiate, resolveChoice, buyAsset, ownedAssets,
 } from '../js/engine.js';
 
 let failures = 0;
@@ -213,6 +213,31 @@ assert(aw.milestones >= 6, `career milestones are completed over a long career (
   const startTopFame = Math.max(...rs.rivals.map((r) => r.fame));
   for (let i = 0; i < 6 * 52; i++) { rs.money = 1e9; advanceWeek(rs); }
   assert(Math.max(...rs.rivals.map((r) => r.fame)) > startTopFame, 'rivals gain fame over a career');
+}
+
+// 7) Billing progression, streaming, taxes, and lifestyle assets
+{
+  // Open-call newcomers never get leading roles; stars always do.
+  const openLeads = Array.from({ length: 300 }, () => makeRole(2, true)).filter((r) => r.billing === 'lead').length;
+  assert(openLeads === 0, 'open-call newcomers are not offered leading roles');
+  const starLeads = Array.from({ length: 300 }, () => makeRole(85, false)).filter((r) => r.billing === 'lead').length;
+  assert(starLeads > 250, 'established stars are offered leading roles');
+
+  // Streaming-era categories exist on the agented board.
+  const cats = new Set(Array.from({ length: 1500 }, () => makeRole(70, false).category));
+  assert(cats.has('streamfilm') && cats.has('streamseries'), 'streaming projects appear on the board');
+
+  // Progressive income tax.
+  assert(taxFor(0) === 0 && taxFor(200000) > taxFor(40000) && taxFor(40000) > 0, 'income tax is progressive');
+
+  // Lifestyle assets: purchase, ownership, and ongoing upkeep.
+  const s = newGame('Tycoon', 'normal');
+  s.money = 2000000;
+  const r = buyAsset(s, 'mansion');
+  assert(r.ok && ownedAssets(s).some((a) => a.key === 'mansion'), 'lifestyle assets can be purchased');
+  const before = s.money;
+  s.money = 2000000; advanceWeek(s);
+  assert(s.money < 2000000, 'asset upkeep is charged weekly');
 }
 
 console.log('');

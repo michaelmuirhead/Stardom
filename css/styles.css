@@ -294,5 +294,13 @@ footer {
 .card-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .card-actions .btn { flex: 1; }
 
+/* Billing badges */
+.bill { font-size: 10px; font-weight: 700; border-radius: 999px; padding: 1px 7px; vertical-align: middle; }
+.bill-lead { background: #2a2718; color: var(--gold2); border: 1px solid var(--gold); }
+.bill-supporting { background: #1d2533; color: #8fb7ff; border: 1px solid #2e3150; }
+.bill-cameo { background: #241d24; color: var(--muted); border: 1px solid var(--line); }
+
+#help { padding: 6px 12px; font-size: 16px; line-height: 1; }
+
 .muted { color: var(--muted); }
 .small { font-size: 12px; }

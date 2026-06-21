@@ -1,10 +1,11 @@
 // ui.js — rendering & event wiring
-import { CLASSES, GENRES, GENRE_KEYS, CEREMONIES, MILESTONES, fameTier } from './data.js';
+import { CLASSES, GENRES, GENRE_KEYS, CEREMONIES, MILESTONES, BILLING, ASSETS, taxFor, fameTier } from './data.js';
 import {
   audition, auditionChance, takeClass, network, rest, sideJob, extraWork, toggleAgent,
   writeScript, sellScript, startProduction, estimateProduction, advanceWeek, isBusy, BUDGET_TIERS,
   catchUp, quitSeries, specialty, diffOf, agentReady, AGENT_FAME_REQ, AGENT_CREDITS_REQ,
   retire, careerLegacy, checkMilestones, typecastInfo, negotiate, resolveChoice,
+  buyAsset, ownedAssets,
 } from './engine.js';
 
 let S = null;        // current game state
@@ -24,7 +25,55 @@ const money = (n) => (n < 0 ? '-$' + Math.abs(n).toLocaleString() : '$' + n.toLo
 export function bindUI(state, mutateCb) {
   S = state;
   onMutate = mutateCb;
+  const help = $('#help');
+  if (help) help.onclick = () => showTutorial(true);
   render();
+  showTutorial(false); // first-time only
+}
+
+// ---- Tutorial overlay ------------------------------------------------------
+const TUTORIAL_KEY = 'stardom.tutorialSeen';
+const TUTORIAL = [
+  { t: '🎬 Welcome to Stardom', d: 'You\'re an aspiring actor chasing fame and fortune. Each turn is one week — spend energy on actions, then hit <b>Advance Week</b> to make progress.' },
+  { t: '🎟️ Auditions', d: 'Audition for roles on the casting board. Win or lose, every audition sharpens your craft, and near-misses become 📞 callbacks. You can also 🤝 negotiate a deal before auditioning.' },
+  { t: '💵 Staying Afloat', d: 'Rent is due every week (and income is taxed yearly). Between roles, take 🎬 extra work or a 🍽️ side job for cash — don\'t go broke.' },
+  { t: '📚 Build & Break In', d: 'Train to raise your craft, then sign an agent (18 fame + 3 credits) to unlock studio films, streaming and TV. Climb from cameos to leading roles.' },
+  { t: '🎯 Goals, Awards & Legacy', d: 'The <b>Goals</b> tab guides your rise. Prestige work earns nominations across awards season — co-stars and rivals included — until you retire into the Hall of Fame.' },
+];
+
+function showTutorial(force) {
+  try {
+    if (!force && localStorage.getItem(TUTORIAL_KEY)) return;
+  } catch (e) { /* ignore */ }
+  let step = 0;
+  const overlay = el('div', 'modal-overlay');
+  overlay.id = 'tutorial';
+  const card = el('div', 'modal-card');
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+
+  const finish = () => {
+    try { localStorage.setItem(TUTORIAL_KEY, '1'); } catch (e) { /* ignore */ }
+    overlay.remove();
+  };
+
+  const draw = () => {
+    const s = TUTORIAL[step];
+    card.innerHTML = `<div class="modal-ic">${s.t.split(' ')[0]}</div>
+      <h2>${s.t.replace(/^\S+\s/, '')}</h2>
+      <p class="modal-text">${s.d}</p>
+      <p class="muted small">Step ${step + 1} of ${TUTORIAL.length}</p>`;
+    const row = el('div', 'card-actions');
+    if (step > 0) row.appendChild(actionBtn('← Back', () => { step--; draw(); }));
+    if (step < TUTORIAL.length - 1) {
+      const skip = actionBtn('Skip', finish); row.appendChild(skip);
+      const next = actionBtn('Next →', () => { step++; draw(); }); next.classList.add('primary'); row.appendChild(next);
+    } else {
+      const done = actionBtn('Let\'s go! 🎬', finish); done.classList.add('primary'); row.appendChild(done);
+    }
+    card.appendChild(row);
+  };
+  draw();
 }
 
 function act(result) {
@@ -112,6 +161,7 @@ const TABS = [
   ['goals', '🎯 Goals'],
   ['train', '📚 Train'],
   ['create', '🎬 Create'],
+  ['finances', '💰 Finances'],
   ['people', '👥 People'],
   ['career', '👤 Career'],
 ];
@@ -134,6 +184,7 @@ function renderPanel() {
   else if (activeTab === 'goals') p.appendChild(goalsView());
   else if (activeTab === 'train') p.appendChild(trainView());
   else if (activeTab === 'create') p.appendChild(createView());
+  else if (activeTab === 'finances') p.appendChild(financesView());
   else if (activeTab === 'people') p.appendChild(peopleView());
   else if (activeTab === 'career') p.appendChild(careerView());
 }
@@ -188,7 +239,7 @@ function roleCard(r) {
   c.innerHTML = `
     ${r.callback ? '<div class="badge">📞 Callback — they liked you</div>' : ''}
     <div class="card-head"><span class="card-ic">${r.icon}</span>
-      <div><div class="card-title">${r.title}</div>
+      <div><div class="card-title">${r.title} <span class="bill bill-${r.billing || 'supporting'}">${(BILLING[r.billing] || BILLING.supporting).label}</span></div>
       <div class="muted small">${r.genreIcon} ${r.genreName} ${r.catName} · ${r.part}${r.openCall ? ' · 📭 open call' : ''}</div></div></div>
     <div class="reqs">
       <span>💵 ${money(r.pay)}${r.negotiated === 'up' ? ' 🤝' : ''}</span>
@@ -387,6 +438,40 @@ function goalCard(m, complete) {
     <div class="muted small">${m.desc}</div></div></div>
     ${reward ? `<div class="muted small">Reward: ${reward}${complete && S.milestonesDone[m.key] ? ` · <span class="good">done Yr ${S.milestonesDone[m.key]}</span>` : ''}</div>` : ''}`;
   return card;
+}
+
+// ---- Finances view (income, taxes, lifestyle assets) -----------------------
+function financesView() {
+  const wrap = el('div', 'view');
+  wrap.appendChild(el('h2', null, '💰 Finances'));
+
+  const upkeep = ownedAssets(S).reduce((t, a) => t + a.upkeep, 0);
+  const estTax = taxFor(S.yearIncome || 0);
+  const summary = el('div', 'hof-grid');
+  const stat = (lab, val) => `<div class="hof-stat"><span class="hof-val">${val}</span><span class="hof-lab">${lab}</span></div>`;
+  summary.innerHTML = stat('Net worth', money(S.money))
+    + stat('Income this yr', money(Math.round(S.yearIncome || 0)))
+    + stat('Est. tax due', money(estTax))
+    + stat('Weekly upkeep', money(diffOf(S).living + upkeep));
+  wrap.appendChild(summary);
+  wrap.appendChild(el('p', 'muted small', 'Income is taxed each year (progressively). Lifestyle assets cost a fortune to maintain but boost your fame and status — live large, but keep the work coming.'));
+
+  wrap.appendChild(el('h3', null, '🏛️ Lifestyle & Assets'));
+  const grid = el('div', 'grid');
+  for (const a of ASSETS) {
+    const owned = (S.assets || []).includes(a.key);
+    const card = el('div', 'card' + (owned ? ' goal-done' : ''));
+    card.innerHTML = `<div class="card-head"><span class="card-ic">${a.icon}</span>
+      <div><div class="card-title">${a.name}</div>
+      <div class="muted small">${a.desc}</div></div></div>
+      <div class="reqs small"><span>💵 ${money(a.cost)}</span><span>🔧 ${money(a.upkeep)}/wk</span>
+        <span>⭐ +${a.fame}</span>${a.energy ? `<span>⚡ +${a.energy}/wk</span>` : ''}</div>`;
+    if (owned) card.appendChild(el('div', 'good small', '✅ Owned'));
+    else card.appendChild(actionBtn(`Buy (${money(a.cost)})`, () => act(buyAsset(S, a.key)), S.money < a.cost));
+    grid.appendChild(card);
+  }
+  wrap.appendChild(grid);
+  return wrap;
 }
 
 // ---- People view (co-stars & relationships) --------------------------------

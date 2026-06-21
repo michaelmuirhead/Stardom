@@ -43,10 +43,18 @@ the industry:
 | 📡 TV Series | high | high | high |
 | 🎥 Indie Film | low | mid | very high |
 | 🎬 Studio Film | very high | very high | very high |
+| 🍿 Streaming Film | huge | high | high |
+| 📱 Streaming Series | high | high | mid |
 
 Your odds depend on your **acting skill**, **fame**, **reputation**, and whether
 you have an **agent**. Land a role and you're in production for several weeks,
 earning pay and—on wrap—fame, skill, and prestige.
+
+**Billing — from bit parts to leading roles.** Every role has a billing tier:
+**Cameo → Supporting → Lead**. As an unknown you'll only be offered cameos and
+small supporting parts; leading roles open up as your fame grows, and they pay
+and profile far more. Billing also gates awards — only supporting and lead
+performances qualify (a cameo never wins an Oscar).
 
 **Starting out (the grind).** Without representation you only see **Open Calls** —
 smaller, lower-paid commercials, TV movies, and indie films. Every audition
@@ -89,6 +97,16 @@ small reward and giving you direction at every stage.
 buyout, a method-acting demand, a viral controversy, a passion project versus a
 fat paycheck — and you choose how to handle it. Each choice has real consequences
 for your money, fame, reputation, craft, and relationships.
+
+**Money & lifestyle.** A **💰 Finances** tab tracks your net worth, annual income,
+and tax bill — income is taxed **progressively** every year, so the more you make
+the more the taxman takes. Spend your fortune on **lifestyle assets** (a sports
+car, a Hollywood mansion, a yacht, a private jet…): each grants a fame/status
+bump and a comfort boost to your weekly energy, but carries steep weekly upkeep —
+live large, but keep the work coming.
+
+**First-time tutorial.** New players get a short guided walkthrough of the core
+loop on their first game; replay it anytime via the **❓** button in the header.
 
 **Co-stars & relationships.** Land a role and you meet co-stars, who become
 lasting contacts. A close, famous ally boosts your audition odds; a famous
