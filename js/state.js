@@ -1,5 +1,5 @@
 // state.js — game state creation, persistence
-import { START, DIFFICULTIES, GENRE_KEYS, fullName, makeRole } from './data.js';
+import { START, DIFFICULTIES, GENRE_KEYS, fullName, makeRole, makeRival } from './data.js';
 
 const SAVE_KEY = 'stardom.save.v1';
 
@@ -26,8 +26,12 @@ export function newGame(playerName, difficultyKey) {
     genres: Object.fromEntries(GENRE_KEYS.map((k) => [k, 0])), // affinity XP
     contacts: [],        // co-stars & industry relationships
     partner: null,       // current romantic partner (contact id)
+    rivals: [makeRival(START.fame), makeRival(START.fame)], // career-long peers
+    pendingChoice: null, // an unresolved narrative dilemma
 
     careerPrestige: 0,   // cumulative prestige across your whole career
+    assets: [],          // owned lifestyle assets (keys)
+    yearIncome: 0,       // gross income this year (for taxes)
     milestonesDone: {},  // milestone key -> year completed
     stats: { auditions: 0, landed: 0, classes: 0, seasons: 0, wins: 0, noms: 0, written: 0, extra: 0 },
     gameOver: false,

@@ -76,6 +76,16 @@ export const CATEGORIES = {
     payBase: 15000, fameBase: 10, skillBase: 6, weeks: [6, 9, 12],
     prestige: 1.6, blurb: 'The big leagues. Big budgets, big risk.',
   },
+  streamfilm: {
+    key: 'streamfilm', name: 'Streaming Film', icon: '🍿',
+    payBase: 18000, fameBase: 9, skillBase: 6, weeks: [5, 7, 10],
+    prestige: 1.4, blurb: 'A splashy streaming-platform original. Pays huge.',
+  },
+  streamseries: {
+    key: 'streamseries', name: 'Streaming Series', icon: '📱',
+    payBase: 13000, fameBase: 8, skillBase: 5, weeks: [6, 8, 10],
+    prestige: 1.1, blurb: 'A binge-released limited series.',
+  },
 };
 
 // ---- Role title flavor -----------------------------------------------------
@@ -85,8 +95,21 @@ const NOUN = ['Promise', 'Horizon', 'Echo', 'Dahlia', 'Empire', 'Reckoning',
   'Affair', 'Gambit', 'Requiem', 'Paradise', 'Stranger', 'Inheritance', 'Tide'];
 const COMMERCIALS = ['Sparkle Soda', 'TurboClean', 'Aurora Phones', 'Cozy Mattress',
   'GreenLeaf Tea', 'Velocity Motors', 'Sunbeam Cereal', 'PureGlow Skincare'];
-const PART = ['the Lead', 'a Supporting Role', 'the Antagonist', 'the Love Interest',
-  'the Comic Relief', 'a Cameo', 'the Narrator', 'an Ensemble Part'];
+// Billing tiers: you climb from bit parts to leading roles as you rise.
+export const BILLING = {
+  cameo: { key: 'cameo', label: 'Cameo', rank: 1, payMult: 0.45, fameMult: 0.4, prestigeMult: 0.3, fameReqAdd: 0, parts: ['a Cameo', 'a Bit Part', 'a Minor Role', 'an Extra Line'] },
+  supporting: { key: 'supporting', label: 'Supporting', rank: 2, payMult: 0.9, fameMult: 0.85, prestigeMult: 0.8, fameReqAdd: 3, parts: ['a Supporting Role', 'the Best Friend', 'the Love Interest', 'the Antagonist'] },
+  lead: { key: 'lead', label: 'Lead', rank: 3, payMult: 1.5, fameMult: 1.5, prestigeMult: 1.4, fameReqAdd: 10, parts: ['the Lead', 'the Protagonist', 'the Title Role'] },
+};
+
+// Decide a role's billing from the player's standing and the project's scale.
+function rollBilling(playerFame, tier, openCall) {
+  const score = tier * 1.0 + playerFame / 25 + rf(-0.5, 1.2);
+  let key = score > 2.3 ? 'lead' : score > 1.0 ? 'supporting' : 'cameo';
+  // Marquee leading roles rarely come from open calls.
+  if (openCall && key === 'lead' && Math.random() < 0.7) key = 'supporting';
+  return BILLING[key];
+}
 
 export const FIRST_NAMES = ['Ava', 'Liam', 'Sofia', 'Noah', 'Mia', 'Ethan', 'Isla',
   'Mason', 'Zoe', 'Leo', 'Nina', 'Theo', 'Ruby', 'Felix', 'Cleo', 'Hugo'];
@@ -122,13 +145,14 @@ export function makeRole(playerFame, openCall = false) {
   // Open-call gigs (student films, local spots, day players) pay & profile less.
   const disc = openCall ? 0.7 : 1;
 
+  const billing = rollBilling(playerFame, tier, openCall);
   const skillReq = Math.round(cat.skillBase * 4 + tier * 9 + rf(-3, 5));
-  const fameReq = Math.round(cat.fameBase * 1.2 + tier * 6 + rf(-2, 4));
-  const pay = Math.round(cat.payBase * mult * rf(0.8, 1.3) * disc);
-  const fameGain = +(cat.fameBase * mult * rf(0.8, 1.25) * disc).toFixed(1);
+  const fameReq = Math.round(cat.fameBase * 1.2 + tier * 6 + billing.fameReqAdd + rf(-2, 4));
+  const pay = Math.round(cat.payBase * mult * billing.payMult * rf(0.8, 1.3) * disc);
+  const fameGain = +(cat.fameBase * mult * billing.fameMult * rf(0.8, 1.25) * disc).toFixed(1);
   const skillGain = +(cat.skillBase * rf(0.8, 1.4) + tier * 0.6).toFixed(1);
   const weeks = cat.weeks[tier];
-  const prestige = +(cat.prestige * mult * rf(0.7, 1.2) * disc).toFixed(2);
+  const prestige = +(cat.prestige * mult * billing.prestigeMult * rf(0.7, 1.2) * disc).toFixed(2);
   const genre = pick(GENRE_KEYS);
 
   return {
@@ -137,7 +161,8 @@ export function makeRole(playerFame, openCall = false) {
     category: cat.key,
     catName: cat.name,
     icon: cat.icon,
-    part: pick(PART),
+    billing: billing.key,
+    part: pick(billing.parts),
     openCall,
     genre,
     genreName: GENRES[genre].name,
@@ -167,6 +192,18 @@ export function makeCostar(playerFame) {
 }
 
 function clampNum(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+// A named career-long rival: a peer who competes for your roles and awards.
+export function makeRival(playerFame) {
+  const fame = Math.round(clampNum(playerFame + rf(3, 18), 2, 100));
+  return {
+    id: 'rv' + Math.random().toString(36).slice(2, 9),
+    name: fullName(),
+    fame,
+    skill: Math.round(clampNum(fame * rf(0.7, 1.1) + 8, 5, 100)),
+    rivalry: Math.round(rf(10, 30)),  // 0..100 intensity
+  };
+}
 
 // ---- Classes / training ----------------------------------------------------
 export const CLASSES = [
@@ -206,6 +243,86 @@ export const EVENTS = [
   {
     id: 'flop', chance: 0.03, when: (s) => s.fame > 50,
     run: (s) => ({ msg: '💸 An old project underperformed in re-runs. -Fame.', delta: { fame: -(1 + Math.random() * 3) } }),
+  },
+];
+
+// ---- Narrative dilemmas (choice events) ------------------------------------
+// Each option's `outcome(s)` returns a delta + message; the engine applies it
+// (so logic stays here and only serializable display data is stored in state).
+// Supported delta keys: money, fame, rep, acting, energy, rivalry, partnerRel.
+export const CHOICE_EVENTS = [
+  {
+    id: 'tabloid', when: (s) => s.fame > 18,
+    title: '📰 A Tabloid Comes Knocking',
+    text: 'A gossip magazine offers $8,000 for a tell-all about a co-star\'s on-set behavior.',
+    options: [
+      { label: 'Take the money', outcome: () => ({ money: 8000, rep: -8, partnerRel: -10, msg: 'You cash in — but the industry frowns, and it stings close to home.' }) },
+      { label: 'Politely decline', outcome: () => ({ rep: 4, msg: 'You keep your mouth shut. Colleagues note your discretion.' }) },
+    ],
+  },
+  {
+    id: 'method',
+    title: '🎭 Going Method',
+    text: 'A demanding director wants you to stay in character for the entire shoot.',
+    options: [
+      { label: 'Fully commit', outcome: () => ({ acting: rf(2, 4), energy: -25, rep: 2, msg: 'Grueling — but your craft sharpens and critics take note.' }) },
+      { label: 'Keep it professional', outcome: () => ({ msg: 'You deliver a solid, sane performance. No harm done.' }) },
+    ],
+  },
+  {
+    id: 'feud', when: (s) => (s.rivals || []).some((r) => r.rivalry > 40),
+    title: '😤 A Public Jab',
+    text: 'A rival took a swipe at you in an interview. The press wants your response.',
+    options: [
+      { label: 'Clap back', outcome: () => ({ fame: rf(2, 5), rivalry: 15, rep: -3, msg: 'The feud makes headlines. Fame up, but it turns ugly.' }) },
+      { label: 'Take the high road', outcome: () => ({ rep: 5, rivalry: -5, msg: 'You stay gracious. The industry respects it.' }) },
+    ],
+  },
+  {
+    id: 'viral_temper', when: (s) => s.fame > 35,
+    title: '📹 Caught on Camera',
+    text: 'A clip of you losing your temper on set is going viral.',
+    options: [
+      { label: 'Issue a sincere apology', outcome: () => ({ fame: -2, rep: 4, msg: 'You own it. Fans forgive; your reputation recovers.' }) },
+      { label: 'Double down', outcome: () => ({ fame: rf(2, 6), rep: -7, msg: 'You lean into the chaos. More famous, less respected.' }) },
+    ],
+  },
+  {
+    id: 'gala', when: (s) => s.money > 20000,
+    title: '🎗️ Charity Gala',
+    text: 'A high-profile charity asks you to headline their fundraiser — and donate.',
+    options: [
+      { label: 'Donate generously ($15k)', outcome: () => ({ money: -15000, rep: 8, fame: 2, msg: 'Your generosity earns goodwill across the industry.' }) },
+      { label: 'Attend, don\'t donate', outcome: () => ({ fame: 1, msg: 'You show your face. Nice photos, modest buzz.' }) },
+      { label: 'Skip it', outcome: () => ({ rep: -2, msg: 'You stay home. A few eyebrows raise.' }) },
+    ],
+  },
+  {
+    id: 'passion',
+    title: '🎬 Passion vs. Paycheck',
+    text: 'Two scripts land on your desk: a soulless blockbuster cameo and a tiny, brilliant indie.',
+    options: [
+      { label: 'Chase the paycheck', outcome: () => ({ money: 30000, rep: -3, msg: 'Easy money. The art crowd sighs.' }) },
+      { label: 'Follow your heart', outcome: () => ({ rep: 6, acting: rf(1, 3), msg: 'The indie pays nothing but feeds your craft and credibility.' }) },
+    ],
+  },
+  {
+    id: 'mentor', when: (s) => s.fame > 50,
+    title: '🌱 A Rising Hopeful',
+    text: 'A nervous newcomer asks you to mentor them.',
+    options: [
+      { label: 'Take them under your wing', outcome: () => ({ energy: -15, rep: 5, msg: 'You pay it forward. The community admires you.' }) },
+      { label: 'You\'re too busy', outcome: () => ({ msg: 'You politely decline. No one blames you... much.' }) },
+    ],
+  },
+  {
+    id: 'campaign', when: (s) => s.fame > 40 && s.money > 25000,
+    title: '📣 Awards Campaign',
+    text: 'Your team pitches an expensive "For Your Consideration" campaign this season.',
+    options: [
+      { label: 'Fund the campaign ($20k)', outcome: () => ({ money: -20000, rep: 3, fame: 4, msg: 'The billboards go up. Voters are paying attention.' }) },
+      { label: 'Let the work speak', outcome: () => ({ msg: 'You trust the performance to stand on its own.' }) },
+    ],
   },
 ];
 
@@ -267,8 +384,8 @@ export const CEREMONIES = [
 
 // Map a filmography credit's category label to an awards medium.
 export function creditMedium(category) {
-  if (category === 'Indie Film' || category === 'Studio Film' || category === 'Produced') return 'film';
-  if (category === 'TV Series' || category === 'TV Movie') return 'tv';
+  if (['Indie Film', 'Studio Film', 'Streaming Film', 'Produced'].includes(category)) return 'film';
+  if (['TV Series', 'TV Movie', 'Streaming Series'].includes(category)) return 'tv';
   return 'other'; // commercials etc. are not awards-eligible
 }
 
@@ -286,6 +403,31 @@ export const HALL_OF_FAME = [
 // Legacy score at/above this earns an honorary Lifetime Achievement Award.
 export const LIFETIME_ACHIEVEMENT_MIN = 480;
 
+// ---- Finances: lifestyle assets & taxes ------------------------------------
+// One-time purchases. On buy: a fame/reputation bump (you're seen succeeding).
+// Ongoing: weekly upkeep (a money sink) and a comfort bonus to weekly energy.
+export const ASSETS = [
+  { key: 'car', name: 'Sports Car', icon: '🏎️', cost: 60000, upkeep: 90, fame: 2, rep: 1, energy: 0, desc: 'Turn heads on the boulevard.' },
+  { key: 'condo', name: 'Hillside Condo', icon: '🏠', cost: 180000, upkeep: 250, fame: 3, rep: 2, energy: 3, desc: 'A comfortable home base.' },
+  { key: 'art', name: 'Art Collection', icon: '🖼️', cost: 400000, upkeep: 300, fame: 3, rep: 4, energy: 0, desc: 'Cultured cachet among the elite.' },
+  { key: 'mansion', name: 'Hollywood Mansion', icon: '🏡', cost: 900000, upkeep: 1400, fame: 7, rep: 3, energy: 5, desc: 'The address that says you\'ve arrived.' },
+  { key: 'yacht', name: 'Luxury Yacht', icon: '🛥️', cost: 1800000, upkeep: 2800, fame: 8, rep: 2, energy: 3, desc: 'Float above it all.' },
+  { key: 'jet', name: 'Private Jet', icon: '✈️', cost: 6000000, upkeep: 7000, fame: 10, rep: 4, energy: 6, desc: 'The ultimate flex.' },
+];
+
+// Progressive annual income tax.
+export function taxFor(income) {
+  if (income <= 0) return 0;
+  const brackets = [[50000, 0.10], [150000, 0.22], [400000, 0.32], [Infinity, 0.40]];
+  let tax = 0, prev = 0;
+  for (const [cap, rate] of brackets) {
+    if (income <= prev) break;
+    tax += (Math.min(income, cap) - prev) * rate;
+    prev = cap;
+  }
+  return Math.round(tax);
+}
+
 // ---- Milestones / onboarding ----------------------------------------------
 // Career goals that guide the player and grant small rewards on completion.
 // `check(s)` is evaluated against game state; `reward` is applied once.
@@ -295,7 +437,10 @@ export const MILESTONES = [
   { key: 'first_credit', icon: '🎞️', name: 'In the Credits', desc: 'Earn your first on-screen credit.', reward: { money: 300 }, check: (s) => s.filmography.length > 0 },
   { key: 'agent', icon: '🕴️', name: 'Represented', desc: 'Sign with a talent agent.', reward: { rep: 4 }, check: (s) => s.hasAgent },
   { key: 'fame25', icon: '⭐', name: 'Recognizable', desc: 'Reach 25 fame.', reward: { money: 1000 }, check: (s) => s.fame >= 25 },
+  { key: 'first_lead', icon: '🎬', name: 'Leading Role', desc: 'Land a lead (top-billed) role.', reward: { money: 500 }, check: (s) => s.filmography.some((f) => f.acted && (f.billing === 'lead' || (f.lead && !f.billing))) },
   { key: 'studio_film', icon: '🎥', name: 'Studio Player', desc: 'Appear in a studio film.', reward: { rep: 5 }, check: (s) => s.filmography.some((f) => f.category === 'Studio Film' && f.acted) },
+  { key: 'streaming', icon: '📱', name: 'Streaming Star', desc: 'Appear in a streaming project.', reward: { rep: 4 }, check: (s) => s.filmography.some((f) => (f.category === 'Streaming Film' || f.category === 'Streaming Series') && f.acted) },
+  { key: 'mansion', icon: '🏡', name: 'Living the Dream', desc: 'Buy a Hollywood mansion.', reward: { rep: 4 }, check: (s) => (s.assets || []).includes('mansion') },
   { key: 'tv_regular', icon: '📡', name: 'Series Regular', desc: 'Star in a season of TV.', reward: { rep: 4 }, check: (s) => (s.stats.seasons || 0) > 0 },
   { key: 'first_script', icon: '✍️', name: 'Screenwriter', desc: 'Write your first script.', reward: { rep: 3 }, check: (s) => (s.stats.written || 0) > 0 },
   { key: 'produce', icon: '💼', name: 'Mogul in the Making', desc: 'Produce a film.', reward: { rep: 5 }, check: (s) => s.filmography.some((f) => f.produced) },

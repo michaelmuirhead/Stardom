@@ -2,8 +2,9 @@
 import {
   WEEKS_PER_YEAR, AGENT_CUT, CLASSES, EVENTS,
   DIFFICULTIES, GENRES, GENRE_KEYS, CEREMONIES, creditMedium,
-  HALL_OF_FAME, LIFETIME_ACHIEVEMENT_MIN, MILESTONES,
-  projectTitle, makeRole, makeCostar,
+  HALL_OF_FAME, LIFETIME_ACHIEVEMENT_MIN, MILESTONES, CHOICE_EVENTS,
+  ASSETS, taxFor,
+  projectTitle, makeRole, makeCostar, makeRival,
 } from './data.js';
 import { pushLog, refreshOffers } from './state.js';
 
@@ -66,6 +67,34 @@ function spendEnergy(s, amount) {
   s.energy = clamp(s.energy - amount, 0, s.maxEnergy);
 }
 
+// All work income flows through here so it counts toward annual taxes.
+function earn(s, amount) {
+  s.money += amount;
+  s.yearIncome = (s.yearIncome || 0) + Math.max(0, amount);
+}
+
+// ---- Lifestyle assets ------------------------------------------------------
+export function ownedAssets(s) {
+  return ASSETS.filter((a) => (s.assets || []).includes(a.key));
+}
+function lifestyleUpkeep(s) { return ownedAssets(s).reduce((t, a) => t + a.upkeep, 0); }
+function lifestyleEnergy(s) { return ownedAssets(s).reduce((t, a) => t + a.energy, 0); }
+
+export function buyAsset(s, key) {
+  if (s.gameOver) return { ok: false, msg: 'The game is over.' };
+  const a = ASSETS.find((x) => x.key === key);
+  if (!a) return { ok: false, msg: 'Unknown purchase.' };
+  if ((s.assets || []).includes(key)) return { ok: false, msg: 'You already own that.' };
+  if (s.money < a.cost) return { ok: false, msg: 'You can\'t afford that.' };
+  s.money -= a.cost;
+  if (!s.assets) s.assets = [];
+  s.assets.push(key);
+  gainFame(s, a.fame);
+  s.reputation = clamp(s.reputation + a.rep, 0, 100);
+  pushLog(s, `${a.icon} You bought a ${a.name}! +${a.fame} fame, but +$${a.upkeep}/wk upkeep.`);
+  return { ok: true, msg: `Bought a ${a.name}.` };
+}
+
 // Best-connected famous friend gives you an audition edge.
 function connectionBonus(s) {
   if (!s.contacts || !s.contacts.length) return 0;
@@ -91,6 +120,8 @@ export function auditionChance(s, role) {
   if (tc.genre && role.genre !== tc.genre) chance -= tc.degree * 0.15;
   // A callback means they already liked you — better shot the second time.
   if (role.callback) chance += 0.18;
+  // You soured this room during a botched negotiation.
+  if (role.hagglePenalty) chance -= role.hagglePenalty;
   return clamp(chance, 0.03, 0.97);
 }
 
@@ -136,10 +167,103 @@ export function audition(s, roleId) {
     return { ok: true, won: false, callback: true, msg: `Callback for "${role.title}"!` };
   }
 
-  // Otherwise you've used your shot.
+  // Otherwise you've used your shot. Sometimes a rival snags the part.
   s.offers = s.offers.filter((r) => r.id !== roleId);
+  const rival = Math.random() < 0.4 ? pickRival(s) : null;
+  if (rival) {
+    rival.rivalry = clamp(rival.rivalry + rf(2, 6), 0, 100);
+    rival.fame = Math.round(clamp(rival.fame + rf(0.3, 1), 1, 100));
+    pushLog(s, `❌ You lost "${role.title}" — your rival ${rival.name} landed it instead. (+${learn} acting)`);
+    return { ok: true, won: false, msg: `${rival.name} got the part on "${role.title}".` };
+  }
   pushLog(s, `❌ You auditioned for "${role.title}" but didn't get it. (${Math.round(chance * 100)}% odds, +${learn} acting)`);
   return { ok: true, won: false, msg: `No luck on "${role.title}".` };
+}
+
+// ---- Negotiation -----------------------------------------------------------
+// Haggle an offer's deal before you audition. Fame, reputation and (especially)
+// an agent drive your success; pushing too hard can cool the room or kill the
+// offer. One attempt per role.
+export function negotiate(s, roleId) {
+  if (s.gameOver) return { ok: false, msg: 'The game is over.' };
+  const role = s.offers.find((r) => r.id === roleId);
+  if (!role) return { ok: false, msg: 'That offer is gone.' };
+  if (role.negotiated) return { ok: false, msg: 'You\'ve already negotiated this deal.' };
+
+  const chance = clamp(0.32 + s.reputation / 200 + s.fame / 220 + (s.hasAgent ? 0.25 : 0), 0.1, 0.92);
+  if (Math.random() < chance) {
+    const factor = rf(1.12, 1.4);
+    role.pay = Math.round(role.pay * factor);
+    role.negotiated = 'up';
+    if (s.hasAgent) role.fameGain = +(role.fameGain * 1.1).toFixed(1); // better billing
+    pushLog(s, `🤝 You negotiated a better deal on "${role.title}" — pay up ${Math.round((factor - 1) * 100)}%.`);
+    return { ok: true, msg: 'Deal sweetened!' };
+  }
+  // Failure: you came off as difficult.
+  role.negotiated = 'down';
+  s.reputation = clamp(s.reputation - rf(1, 3), 0, 100);
+  if (Math.random() < 0.18) {
+    s.offers = s.offers.filter((r) => r.id !== roleId);
+    pushLog(s, `🚪 You overplayed your hand — the producers walked away from "${role.title}".`);
+    return { ok: false, msg: 'They pulled the offer.' };
+  }
+  role.hagglePenalty = 0.08; // casting cooled on you
+  pushLog(s, `😬 Negotiations on "${role.title}" soured. Casting cooled on you.`);
+  return { ok: false, msg: 'That went badly.' };
+}
+
+// ---- Rivals ----------------------------------------------------------------
+function pickRival(s) {
+  if (!s.rivals || !s.rivals.length) return null;
+  return s.rivals[Math.floor(Math.random() * s.rivals.length)];
+}
+
+// Rivals' careers advance each year; a new challenger can emerge as you rise.
+function updateRivals(s) {
+  if (!s.rivals) s.rivals = [];
+  for (const r of s.rivals) {
+    r.fame = Math.round(clamp(r.fame + rf(0.5, 3) + (r.skill > 60 ? 1 : 0), 1, 100));
+    r.skill = Math.round(clamp(r.skill + rf(0, 1.2), 1, 100));
+    r.rivalry = clamp(r.rivalry - 1, 0, 100); // rivalries cool if not provoked
+  }
+  if (s.fame > 50 && s.rivals.length < 3) {
+    const nemesis = makeRival(s.fame);
+    s.rivals.push(nemesis);
+    pushLog(s, `🔥 A new rival has emerged: ${nemesis.name} is making waves.`);
+  }
+}
+
+// ---- Narrative dilemmas ----------------------------------------------------
+function maybeTriggerChoice(s) {
+  if (s.pendingChoice || s.ceremonyNight || s.gameOver) return;
+  if (Math.random() >= 0.06) return; // ~6%/week
+  const eligible = CHOICE_EVENTS.filter((e) => !e.when || e.when(s));
+  if (!eligible.length) return;
+  const e = eligible[Math.floor(Math.random() * eligible.length)];
+  s.pendingChoice = {
+    id: e.id, title: e.title, text: e.text,
+    options: e.options.map((o) => ({ label: o.label })),
+  };
+}
+
+export function resolveChoice(s, idx) {
+  if (!s.pendingChoice) return { ok: false, msg: 'No decision pending.' };
+  const e = CHOICE_EVENTS.find((x) => x.id === s.pendingChoice.id);
+  s.pendingChoice = null;
+  if (!e || !e.options[idx]) return { ok: false, msg: 'That choice is unavailable.' };
+  const d = e.options[idx].outcome(s) || {};
+  if (d.money) s.money += Math.round(d.money);
+  if (d.fame) gainFame(s, d.fame);
+  if (d.rep) s.reputation = clamp(s.reputation + d.rep, 0, 100);
+  if (d.acting) s.acting = clamp(+(s.acting + d.acting).toFixed(1), 0, 100);
+  if (d.energy) s.energy = clamp(s.energy + d.energy, 0, s.maxEnergy);
+  if (d.rivalry) for (const r of (s.rivals || [])) r.rivalry = clamp(r.rivalry + d.rivalry, 0, 100);
+  if (d.partnerRel && s.partner) {
+    const p = s.contacts.find((c) => c.id === s.partner);
+    if (p) p.rel = clamp(p.rel + d.partnerRel, 0, 100);
+  }
+  if (d.msg) pushLog(s, `🎬 ${d.msg}`);
+  return { ok: true, msg: d.msg || 'Decision made.' };
 }
 
 // ---- Co-stars & relationships ---------------------------------------------
@@ -220,7 +344,7 @@ export function quitSeries(s) {
   addCredit(s, {
     title: `${sh.title} (${sh.season} season${sh.season > 1 ? 's' : ''})`,
     category: 'TV Series', role: sh.part, genre: sh.genreName,
-    acted: true, lead: /lead/i.test(sh.part), costars: (sh.costars || []).map((c) => c.id),
+    acted: true, billing: 'lead', lead: true, costars: (sh.costars || []).map((c) => c.id),
     quality: Math.round(sh.ratings || 50),
   });
   pushLog(s, `🚪 You left "${sh.title}" after ${sh.season} season(s) to pursue other work.`);
@@ -265,7 +389,7 @@ function endSeason(s) {
     addCredit(s, {
       title: `${sh.title} (${sh.season} season${sh.season > 1 ? 's' : ''})`,
       category: 'TV Series', role: sh.part, genre: sh.genreName,
-      acted: true, lead: /lead/i.test(sh.part), costars: (sh.costars || []).map((c) => c.id),
+      acted: true, billing: 'lead', lead: true, costars: (sh.costars || []).map((c) => c.id),
       quality: sh.ratings,
     });
     pushLog(s, `📉 "${sh.title}" was CANCELLED after ${sh.season} season(s) (${sh.ratings} rating). A ${sh.season >= 3 ? 'beloved' : 'brief'} run wraps. +${fg} fame.`);
@@ -329,7 +453,7 @@ export function sideJob(s) {
   if (s.energy < 20) return { ok: false, msg: 'Too tired for a shift.' };
   spendEnergy(s, 20);
   const pay = 250 + Math.floor(Math.random() * 200);
-  s.money += pay;
+  earn(s, pay);
   pushLog(s, `🍽️ Worked a serving shift. +$${pay}.`);
   return { ok: true, msg: `Earned $${pay}.` };
 }
@@ -345,7 +469,7 @@ export function extraWork(s) {
   if (s.energy < EXTRA_ENERGY) return { ok: false, msg: 'Too tired for a day on set.' };
   spendEnergy(s, EXTRA_ENERGY);
   const pay = Math.round(EXTRA_PAY * diffOf(s).payMult * rf(0.8, 1.2));
-  s.money += pay;
+  earn(s, pay);
   const skillGain = +rf(0.2, 0.5).toFixed(2);
   s.acting = clamp(+(s.acting + skillGain).toFixed(1), 0, 100);
   s.stats.extra = (s.stats.extra || 0) + 1;
@@ -433,7 +557,7 @@ export function sellScript(s, scriptId) {
   if (idx < 0) return { ok: false, msg: 'Script not found.' };
   const sc = s.scripts[idx];
   const price = Math.round(sc.quality * 220 * rf(0.7, 1.3));
-  s.money += price;
+  earn(s, price);
   s.reputation = clamp(s.reputation + sc.quality / 30, 0, 100);
   s.scripts.splice(idx, 1);
   // The studio makes the film — you keep an (Oscar-eligible) writing credit.
@@ -527,7 +651,7 @@ function wrapProduction(s, prod) {
   // Box office return scales with budget tier & quality.
   const gross = Math.round(prod.cost * (0.4 + (q / 100) * 2.4) * rf(0.7, 1.3));
   const profit = gross - prod.cost;
-  s.money += gross;
+  earn(s, gross);
   const fameGain = +(q / 100 * 6 * Math.sqrt(prod.scale)).toFixed(1);
   gainFame(s, fameGain);
   const prestige = +(q / 100 * (prod.directed ? 2 : 1.2) * Math.sqrt(prod.scale)).toFixed(2);
@@ -596,7 +720,9 @@ function eligibleFor(c, cat) {
   if (cat.kind === 'acting') {
     if (!c.acted) return false;                    // performances only
     if (c.medium !== cat.medium) return false;
-    if (cat.lead != null && !!c.lead !== cat.lead) return false;
+    const billing = c.billing || (c.lead ? 'lead' : 'supporting');
+    if (billing === 'cameo') return false;         // cameos aren't award-worthy
+    if (cat.lead != null && (billing === 'lead') !== cat.lead) return false;
     return true;
   }
   if (cat.kind === 'writing') return !!c.written && c.medium === 'film';
@@ -671,18 +797,28 @@ function runCeremony(s, cer) {
       category: cat.name, project: mine.title, year: s.year, won: res.won,
     });
     const reactions = costarReactions(s, mine, res.won);
-    results.push({ category: cat.name, project: mine.title, won: res.won, reactions });
+    const rival = pickRival(s);
+    let beatenBy = null;
     if (res.won) {
       s.stats.wins = (s.stats.wins || 0) + 1;
       gainFame(s, 4 * cer.prestige);
       s.reputation = clamp(s.reputation + 6 * cer.prestige, 0, 100);
+      // A rival you beat is none too pleased.
+      if (rival) rival.rivalry = clamp(rival.rivalry + rf(2, 5), 0, 100);
       pushLog(s, `🥇 WON ${cat.name} at the ${cer.name} for "${mine.title}"!`);
     } else {
       s.stats.noms = (s.stats.noms || 0) + 1;
       gainFame(s, 1.5 * cer.prestige);
       s.reputation = clamp(s.reputation + 2 * cer.prestige, 0, 100);
-      pushLog(s, `🎗️ Nominated for ${cat.name} at the ${cer.name} ("${mine.title}").`);
+      // Often a rival is the one who beats you — fuel for the rivalry.
+      if (rival && Math.random() < 0.6) {
+        rival.rivalry = clamp(rival.rivalry + rf(3, 7), 0, 100);
+        rival.fame = Math.round(clamp(rival.fame + rf(0.5, 2), 1, 100));
+        beatenBy = rival.name;
+      }
+      pushLog(s, `🎗️ Nominated for ${cat.name} at the ${cer.name} ("${mine.title}")${beatenBy ? ` — lost to ${beatenBy}` : ''}.`);
     }
+    results.push({ category: cat.name, project: mine.title, won: res.won, reactions, beatenBy });
   }
   // Surface an awards-night summary to the UI when you were in the running.
   if (results.length) {
@@ -753,15 +889,15 @@ export function advanceWeek(s) {
 
   const D = diffOf(s);
 
-  // Living expenses
-  s.money -= D.living;
+  // Living expenses (base + lifestyle upkeep)
+  s.money -= D.living + lifestyleUpkeep(s);
 
   // Active acting role progresses
   if (s.active) {
     const a = s.active;
     const weekly = Math.round(a.role.pay * D.payMult / a.totalWeeks);
     const net = s.hasAgent ? Math.round(weekly * (1 - AGENT_CUT)) : weekly;
-    s.money += net;
+    earn(s, net);
     a.weeksLeft--;
     if (a.weeksLeft <= 0) {
       // Wrap: bond with co-stars; their star power rubs off on your fame.
@@ -776,7 +912,8 @@ export function advanceWeek(s) {
       addCredit(s, {
         title: a.role.title, category: a.role.catName,
         role: a.role.part, genre: a.role.genreName,
-        acted: true, lead: /lead/i.test(a.role.part),
+        acted: true, billing: a.role.billing || 'supporting',
+        lead: a.role.billing === 'lead',
         costars: (a.costars || []).map((c) => c.id),
         quality: Math.round(50 + a.role.prestige * 10),
       });
@@ -790,7 +927,7 @@ export function advanceWeek(s) {
   if (s.activeSeries && s.activeSeries.status === 'filming') {
     const sh = s.activeSeries;
     const weekly = Math.round(sh.salary * D.payMult / sh.totalWeeks);
-    s.money += s.hasAgent ? Math.round(weekly * (1 - AGENT_CUT)) : weekly;
+    earn(s, s.hasAgent ? Math.round(weekly * (1 - AGENT_CUT)) : weekly);
     sh.weeksLeft--;
     if (sh.weeksLeft <= 0) endSeason(s);
   }
@@ -804,8 +941,8 @@ export function advanceWeek(s) {
   }
   s.productions = s.productions.filter((p) => p.weeksLeft > 0 || p._kept);
 
-  // Energy regen (minus any burnout penalty)
-  const regen = 30 - (s.energyPenalty || 0);
+  // Energy regen (base − burnout + lifestyle comfort)
+  const regen = 30 - (s.energyPenalty || 0) + lifestyleEnergy(s);
   s.energy = clamp(s.energy + regen, 0, s.maxEnergy);
   s.energyPenalty = 0;
 
@@ -821,6 +958,14 @@ export function advanceWeek(s) {
     s.week = 1;
     s.year++;
     s.age++;
+    updateRivals(s);
+    // Annual income tax on the year's gross earnings.
+    const tax = taxFor(s.yearIncome || 0);
+    if (tax > 0) {
+      s.money -= tax;
+      pushLog(s, `🧾 Tax season: paid $${tax.toLocaleString()} on $${Math.round(s.yearIncome).toLocaleString()} of income.`);
+    }
+    s.yearIncome = 0;
     pushLog(s, `📅 A new year begins. You are now ${s.age}.`);
   }
 
@@ -831,6 +976,9 @@ export function advanceWeek(s) {
 
   // Career milestones (passive completions: fame/money thresholds, awards, etc.)
   checkMilestones(s);
+
+  // A narrative dilemma may surface this week.
+  maybeTriggerChoice(s);
 
   // Lose condition: deep, sustained debt
   if (s.money < D.debtFloor) {

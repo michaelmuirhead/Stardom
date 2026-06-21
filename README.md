@@ -43,10 +43,18 @@ the industry:
 | 📡 TV Series | high | high | high |
 | 🎥 Indie Film | low | mid | very high |
 | 🎬 Studio Film | very high | very high | very high |
+| 🍿 Streaming Film | huge | high | high |
+| 📱 Streaming Series | high | high | mid |
 
 Your odds depend on your **acting skill**, **fame**, **reputation**, and whether
 you have an **agent**. Land a role and you're in production for several weeks,
 earning pay and—on wrap—fame, skill, and prestige.
+
+**Billing — from bit parts to leading roles.** Every role has a billing tier:
+**Cameo → Supporting → Lead**. As an unknown you'll only be offered cameos and
+small supporting parts; leading roles open up as your fame grows, and they pay
+and profile far more. Billing also gates awards — only supporting and lead
+performances qualify (a cameo never wins an Oscar).
 
 **Starting out (the grind).** Without representation you only see **Open Calls** —
 smaller, lower-paid commercials, TV movies, and indie films. Every audition
@@ -62,6 +70,17 @@ series-regular TV roles that open calls never offer (the agent takes a 12% cut i
 return). Reaching it is a genuine climb of roughly a year of scraping by; fame
 comes slowly while you're an unknown and compounds once you're recognized.
 
+**Negotiating deals.** Before you audition, you can **🤝 negotiate** an offer's
+terms. Your fame, reputation and (especially) your agent drive the odds — succeed
+and your pay jumps (with an agent, your billing improves too); push too hard and
+you'll sour the room or watch the producers walk away. Risk versus reward.
+
+**Rivals.** A handful of named peers shadow your whole career, competing for the
+same roles and awards. They snipe parts out from under you, beat you (or lose to
+you) on awards night, and keep getting more famous over the years — and a fresh
+challenger emerges once you hit the big time. Rivalries heat up with every clash;
+track them on the **People** tab.
+
 **Genre specialization & typecasting.** Every role has a genre (🎭 Drama, 😂 Comedy,
 💥 Action, 👻 Horror, 🚀 Sci-Fi, 💖 Romance). The more you work in a genre, the
 better your audition odds for similar roles — and the more your top genre becomes
@@ -73,6 +92,21 @@ across genres keeps your range — a real strategic tension.
 **Career goals.** A **🎯 Goals** tab tracks ~15 milestones that chart your rise
 from first day on set to Academy Award winner and millionaire, each granting a
 small reward and giving you direction at every stage.
+
+**Narrative dilemmas.** Now and then a situation lands on your desk — a tabloid
+buyout, a method-acting demand, a viral controversy, a passion project versus a
+fat paycheck — and you choose how to handle it. Each choice has real consequences
+for your money, fame, reputation, craft, and relationships.
+
+**Money & lifestyle.** A **💰 Finances** tab tracks your net worth, annual income,
+and tax bill — income is taxed **progressively** every year, so the more you make
+the more the taxman takes. Spend your fortune on **lifestyle assets** (a sports
+car, a Hollywood mansion, a yacht, a private jet…): each grants a fame/status
+bump and a comfort boost to your weekly energy, but carries steep weekly upkeep —
+live large, but keep the work coming.
+
+**First-time tutorial.** New players get a short guided walkthrough of the core
+loop on their first game; replay it anytime via the **❓** button in the header.
 
 **Co-stars & relationships.** Land a role and you meet co-stars, who become
 lasting contacts. A close, famous ally boosts your audition odds; a famous

@@ -2,11 +2,11 @@
 // Runs full simulated careers across every difficulty and asserts the engine
 // stays internally consistent. Exits non-zero on any failure so CI can gate.
 import { newGame } from '../js/state.js';
-import { DIFFICULTIES, GENRE_KEYS } from '../js/data.js';
+import { DIFFICULTIES, GENRE_KEYS, makeRole, taxFor } from '../js/data.js';
 import {
   advanceWeek, audition, auditionChance, takeClass, network, rest, sideJob,
   extraWork, toggleAgent, writeScript, startProduction, isBusy, catchUp, quitSeries,
-  agentReady,
+  agentReady, negotiate, resolveChoice, buyAsset, ownedAssets,
 } from '../js/engine.js';
 
 let failures = 0;
@@ -180,6 +180,65 @@ console.log(`  awards (${YEARS}yr legend): ${aw.wins} wins, ${aw.noms} nominatio
 assert(aw.wins + aw.noms > 0, 'awards season produced nominations/wins over a long career');
 assert(aw.wins < YEARS, `award wins are realistic, not runaway (${aw.wins} over ${YEARS}yr)`);
 assert(aw.milestones >= 6, `career milestones are completed over a long career (${aw.milestones})`);
+
+// 6) Rivals, negotiation, and narrative choices
+{
+  const fresh = newGame('Feature Bot', 'normal');
+  assert((fresh.rivals || []).length >= 2, 'rivals are created at game start');
+
+  // Negotiation: an established, agented actor should usually succeed and raise pay.
+  let negSuccess = 0;
+  for (let i = 0; i < 50; i++) {
+    const s = newGame('Haggler', 'normal');
+    s.fame = 45; s.reputation = 55; s.hasAgent = true;
+    const r = s.offers[0]; const oldPay = r.pay;
+    const res = negotiate(s, r.id);
+    if (res.ok && r.pay > oldPay) negSuccess++;
+  }
+  assert(negSuccess > 25, `negotiation raises pay on success (${negSuccess}/50)`);
+
+  // Narrative choice: trigger one and resolve it cleanly.
+  const cs = newGame('Decider', 'normal');
+  cs.fame = 45; cs.money = 40000; cs.reputation = 50;
+  let guard = 0;
+  while (!cs.pendingChoice && guard++ < 400) { cs.money = 40000; advanceWeek(cs); }
+  assert(!!cs.pendingChoice, 'a narrative dilemma can be triggered');
+  if (cs.pendingChoice) {
+    const r = resolveChoice(cs, 0);
+    assert(r.ok && !cs.pendingChoice, 'a narrative dilemma resolves and clears');
+  }
+
+  // Rivals advance over the years.
+  const rs = newGame('Survivor', 'normal');
+  const startTopFame = Math.max(...rs.rivals.map((r) => r.fame));
+  for (let i = 0; i < 6 * 52; i++) { rs.money = 1e9; advanceWeek(rs); }
+  assert(Math.max(...rs.rivals.map((r) => r.fame)) > startTopFame, 'rivals gain fame over a career');
+}
+
+// 7) Billing progression, streaming, taxes, and lifestyle assets
+{
+  // Open-call newcomers never get leading roles; stars always do.
+  const openLeads = Array.from({ length: 300 }, () => makeRole(2, true)).filter((r) => r.billing === 'lead').length;
+  assert(openLeads === 0, 'open-call newcomers are not offered leading roles');
+  const starLeads = Array.from({ length: 300 }, () => makeRole(85, false)).filter((r) => r.billing === 'lead').length;
+  assert(starLeads > 250, 'established stars are offered leading roles');
+
+  // Streaming-era categories exist on the agented board.
+  const cats = new Set(Array.from({ length: 1500 }, () => makeRole(70, false).category));
+  assert(cats.has('streamfilm') && cats.has('streamseries'), 'streaming projects appear on the board');
+
+  // Progressive income tax.
+  assert(taxFor(0) === 0 && taxFor(200000) > taxFor(40000) && taxFor(40000) > 0, 'income tax is progressive');
+
+  // Lifestyle assets: purchase, ownership, and ongoing upkeep.
+  const s = newGame('Tycoon', 'normal');
+  s.money = 2000000;
+  const r = buyAsset(s, 'mansion');
+  assert(r.ok && ownedAssets(s).some((a) => a.key === 'mansion'), 'lifestyle assets can be purchased');
+  const before = s.money;
+  s.money = 2000000; advanceWeek(s);
+  assert(s.money < 2000000, 'asset upkeep is charged weekly');
+}
 
 console.log('');
 if (failures) {
