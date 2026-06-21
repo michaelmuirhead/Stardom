@@ -21,6 +21,19 @@ function gainFame(s, amt) {
   s.fame = clamp(+(s.fame + delta).toFixed(1), 0, 100);
 }
 
+// ---- Age & health ----------------------------------------------------------
+export function agePhase(age) {
+  if (age < 30) return { key: 'rising', label: 'Rising' };
+  if (age < 45) return { key: 'prime', label: 'In Their Prime' };
+  if (age < 60) return { key: 'veteran', label: 'Veteran' };
+  return { key: 'legacy', label: 'Elder Statesman' };
+}
+
+// Age-driven max energy: stamina tapers past 50.
+function maxEnergyForAge(age) {
+  return Math.round(clamp(100 - Math.max(0, age - 50) * 0.9, 55, 100));
+}
+
 // ---- Difficulty / genre helpers -------------------------------------------
 export function diffOf(s) { return DIFFICULTIES[s.difficulty] || DIFFICULTIES.normal; }
 
@@ -155,6 +168,13 @@ export function auditionChance(s, role) {
   if (role.callback) chance += 0.18;
   // You soured this room during a botched negotiation.
   if (role.hagglePenalty) chance -= role.hagglePenalty;
+  // Ageism: leading roles get harder past your mid-40s — fame softens the blow.
+  // (Behind-the-camera work via pitching/producing is unaffected.)
+  if (role.billing === 'lead' && s.age > 45) {
+    chance -= Math.max(0, s.age - 45) * 0.008 * (1 - s.fame / 150);
+  }
+  // Poor health reads on camera and saps your auditions.
+  if ((s.health ?? 100) < 50) chance -= (50 - s.health) / 300;
   return clamp(chance, 0.03, 0.97);
 }
 
@@ -525,8 +545,23 @@ export function rest(s) {
   if (s.gameOver) return { ok: false, msg: 'The game is over.' };
   const gain = 35;
   s.energy = clamp(s.energy + gain, 0, s.maxEnergy);
+  s.health = clamp((s.health ?? 100) + 2, 0, 100);
   pushLog(s, `😴 You rested. +${gain} energy.`);
   return { ok: true, msg: 'Recharged.' };
+}
+
+// Invest in your wellbeing: a spa/retreat/trainer week restores health & energy.
+const WELLNESS_COST = 12000;
+export function wellness(s) {
+  if (s.gameOver) return { ok: false, msg: 'The game is over.' };
+  if (s.money < WELLNESS_COST) return { ok: false, msg: 'You can\'t afford a wellness retreat right now.' };
+  if ((s.health ?? 100) >= 100 && s.energy >= s.maxEnergy) return { ok: false, msg: 'You\'re already in peak shape.' };
+  s.money -= WELLNESS_COST;
+  const hg = rf(10, 20);
+  s.health = clamp((s.health ?? 100) + hg, 0, 100);
+  s.energy = clamp(s.energy + 25, 0, s.maxEnergy);
+  pushLog(s, `🧘 You spent a week on wellness (trainer, spa, therapy). +${hg.toFixed(0)} health.`);
+  return { ok: true, msg: 'Refreshed and restored.' };
 }
 
 export function sideJob(s) {
@@ -1246,8 +1281,11 @@ export function advanceWeek(s) {
   }
   s.productions = s.productions.filter((p) => p.weeksLeft > 0 || p._kept);
 
-  // Energy regen (base − burnout + lifestyle comfort)
-  const regen = 30 - (s.energyPenalty || 0) + lifestyleEnergy(s);
+  // Overwork erodes health; poor health slows recovery.
+  if (s.energy < 12) s.health = clamp((s.health ?? 100) - rf(1, 3), 0, 100);
+  const healthFactor = 0.55 + (s.health ?? 100) / 220;            // ~0.55–1.0
+  // Energy regen (base − burnout + lifestyle comfort), scaled by health.
+  const regen = Math.round((30 + lifestyleEnergy(s)) * healthFactor) - (s.energyPenalty || 0);
   s.energy = clamp(s.energy + regen, 0, s.maxEnergy);
   s.energyPenalty = 0;
 
@@ -1273,7 +1311,14 @@ export function advanceWeek(s) {
     }
     s.yearIncome = 0;
     s.taxWithheld = 0;
-    pushLog(s, `📅 A new year begins. You are now ${s.age}.`);
+    // Aging: stamina tapers, and fame fades if you go quiet (faster when older).
+    s.maxEnergy = maxEnergyForAge(s.age);
+    s.energy = Math.min(s.energy, s.maxEnergy);
+    const activeRecently = s.filmography.some((f) => f.year >= s.year - 1);
+    const decay = clamp((s.age - 40) * 0.1, 0, 4) * (activeRecently ? 0.3 : 1.4);
+    if (decay > 0) s.fame = clamp(+(s.fame - decay).toFixed(1), 0, 100);
+    if (s.age >= 45) s.health = clamp((s.health ?? 100) - rf(0.5, 2), 0, 100);
+    pushLog(s, `📅 A new year begins. You are now ${s.age}.${decay > 1.5 && !activeRecently ? ' The spotlight is drifting away…' : ''}`);
   }
 
   // Awards season: ceremonies fall on specific weeks through the year.

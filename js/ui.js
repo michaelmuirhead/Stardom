@@ -1,7 +1,7 @@
 // ui.js — rendering & event wiring
 import { CLASSES, GENRES, GENRE_KEYS, CEREMONIES, MILESTONES, BILLING, ASSETS, fameTier } from './data.js';
 import {
-  audition, auditionChance, takeClass, network, rest, sideJob, extraWork, toggleAgent,
+  audition, auditionChance, takeClass, network, rest, sideJob, extraWork, toggleAgent, wellness, agePhase,
   writeScript, pitchScript, startProduction, estimateProduction, advanceWeek, isBusy, BUDGET_TIERS,
   catchUp, quitSeries, specialty, diffOf, agentReady, AGENT_FAME_REQ, AGENT_CREDITS_REQ,
   retire, careerLegacy, careerTotals, checkMilestones, typecastInfo, negotiate, resolveChoice,
@@ -112,6 +112,7 @@ function renderStats() {
     ['⭐', 'Fame', `${S.fame.toFixed(0)} · ${fameTier(S.fame)}`, ''],
     ['🎭', 'Acting', S.acting.toFixed(0), ''],
     ['🤝', 'Reputation', S.reputation.toFixed(0), ''],
+    ['❤️', 'Health', (S.health ?? 100).toFixed(0), (S.health ?? 100) < 40 ? 'warn' : ''],
     ['⚡', 'Energy', `${S.energy}/${S.maxEnergy}`, S.energy < 25 ? 'warn' : ''],
     ['📅', 'Date', `Wk ${S.week}, Yr ${S.year}`, ''],
     ['🎂', 'Age', S.age, ''],
@@ -223,6 +224,7 @@ function auditionsView() {
   quick.appendChild(actionBtn('🎬 Extra work (+$, +craft)', () => act(extraWork(S)), isBusy(S) || S.energy < 14));
   quick.appendChild(actionBtn('🍽️ Side job (+$)', () => act(sideJob(S)), S.energy < 20));
   quick.appendChild(actionBtn('😴 Rest (+energy)', () => act(rest(S))));
+  quick.appendChild(actionBtn('🧘 Wellness (+health)', () => act(wellness(S)), S.money < 12000));
   quick.appendChild(actionBtn('🥂 Network (+rep)', () => act(network(S)), S.energy < 15));
   const aReq = agentReady(S);
   quick.appendChild(actionBtn(
@@ -600,7 +602,7 @@ function careerView() {
   const title = spec ? `${fameTier(S.fame)} · ${spec.icon} ${spec.specialty}` : fameTier(S.fame);
   wrap.appendChild(el('h2', null, `👤 ${S.name} — ${title}`));
   const D = diffOf(S);
-  wrap.appendChild(el('p', 'muted small', `${D.icon} ${D.name} difficulty`));
+  wrap.appendChild(el('p', 'muted small', `${D.icon} ${D.name} difficulty · Age ${S.age} (${agePhase(S.age).label}) · ❤️ Health ${(S.health ?? 100).toFixed(0)}`));
 
   const skills = el('div', 'skills');
   for (const [lab, key] of [['Acting', 'acting'], ['Directing', 'directing'], ['Writing', 'writing'], ['Producing', 'producing']]) {

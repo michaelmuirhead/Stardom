@@ -11,6 +11,7 @@ export function newGame(playerName, difficultyKey) {
     week: 1,
     year: 1,
     ...structuredCloneSafe(START),
+    health: 100,         // wellness; affects energy regen & audition odds
     hasAgent: false,
     energyPenalty: 0,
 
