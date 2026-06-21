@@ -48,10 +48,31 @@ Your odds depend on your **acting skill**, **fame**, **reputation**, and whether
 you have an **agent**. Land a role and you're in production for several weeks,
 earning pay and—on wrap—fame, skill, and prestige.
 
-**Genre specialization.** Every role has a genre (🎭 Drama, 😂 Comedy, 💥 Action,
-👻 Horror, 🚀 Sci-Fi, 💖 Romance). The more you work in a genre, the better your
-audition odds for similar roles — and the more your top genre becomes your public
-brand (e.g. *Action Star*, *Scream Queen*), shown on your Career page.
+**Starting out (the grind).** Without representation you only see **Open Calls** —
+smaller, lower-paid commercials, TV movies, and indie films. Every audition
+teaches you something — you gain a little acting craft win *or* lose. A near-miss
+earns a **📞 callback**: the role stays on the board with better odds next time
+instead of vanishing. When there's no role worth chasing, take **🎬 extra work** —
+background gigs that roughly cover rent while building craft on-theme and
+occasionally introducing you to people on set. Side jobs remain the pure-cash net.
+
+**Signing an agent** is the early-game graduation. It takes a real body of work —
+**18 fame and 3 credits** — and unlocks the full casting board: studio films and
+series-regular TV roles that open calls never offer (the agent takes a 12% cut in
+return). Reaching it is a genuine climb of roughly a year of scraping by; fame
+comes slowly while you're an unknown and compounds once you're recognized.
+
+**Genre specialization & typecasting.** Every role has a genre (🎭 Drama, 😂 Comedy,
+💥 Action, 👻 Horror, 🚀 Sci-Fi, 💖 Romance). The more you work in a genre, the
+better your audition odds for similar roles — and the more your top genre becomes
+your public brand (e.g. *Action Star*, *Scream Queen*), shown on your Career page.
+But lean too hard into one genre and you get **typecast**: casting directors
+struggle to see you in anything else, so your odds in *other* genres drop. Working
+across genres keeps your range — a real strategic tension.
+
+**Career goals.** A **🎯 Goals** tab tracks ~15 milestones that chart your rise
+from first day on set to Academy Award winner and millionaire, each granting a
+small reward and giving you direction at every stage.
 
 **Co-stars & relationships.** Land a role and you meet co-stars, who become
 lasting contacts. A close, famous ally boosts your audition odds; a famous
@@ -69,13 +90,48 @@ finale; you can also choose to leave the show at any time.
 and producing (which unlock as your fame grows).
 
 **Create your own work** in the Create tab once you've trained:
-- ✍️ **Write scripts** — sell them to studios, or produce them yourself.
+- ✍️ **Write scripts** — sell them to studios, or produce them yourself. Each
+  script has a genre and sharpens your writing skill (you learn by doing).
 - 🎬 **Produce** films at micro / mid / blockbuster budgets. Box office depends
   on script quality, your producing skill, and—if you also **direct**—your
-  directing skill.
+  directing skill. Each production also builds your affinity in its genre.
 
-**Award season** happens at the end of each year. Prestigious work earns
-nominations and possibly a **Golden Star**, rocketing your fame and reputation.
+**Awards season** runs through the calendar with four real ceremonies, each
+judging your eligible credits from the trailing year:
+
+| Ceremony | When | Honors |
+|----------|------|--------|
+| 🌐 Golden Globe Awards | early | Best Actor — Film & TV |
+| 🎟️ SAG Awards | late winter | Outstanding Performance — Film & TV |
+| 🏆 Academy Awards | spring | Best Actor, Supporting, Original Screenplay, Director, Picture |
+| 📺 Emmy Awards | fall | Outstanding Lead & Supporting Actor (TV) |
+
+Only prestigious work qualifies — strong films, acclaimed TV, and projects you
+direct or produce; commercials never count. A **nomination** is selective (your
+work must clear an absolute industry bar that's higher at the more prestigious
+ceremonies), and even when nominated you're one of five — **winning is roughly a
+1-in-5 draw**, tilted only modestly by how exceptional the work is. Expect a
+handful of wins across a great career, and an Academy Award to mean something.
+Wins and nominations both boost fame and reputation and are recorded on your
+**Career** page, grouped by ceremony. When you're in the running, an **awards-night
+summary** pops up with that ceremony's results — and the **co-stars** from the
+honored project celebrate with you, deepening those relationships. **Best Original Screenplay** is
+open to films you write — both screenplays you sell to studios and your own
+self-produced projects.
+
+## Retirement & the Hall of Fame
+
+Careers don't run forever. From the **Career** tab you can **retire** at any time
+to cement your legacy and end the game on your own terms (you can also flame out
+via bankruptcy). Retiring computes a **legacy score** from your fame, award wins
+and nominations (Oscars count extra), career prestige, body of work, and
+reputation, then ranks you in the **Hall of Fame**:
+
+🎭 Forgotten Extra → 🎬 Working Actor → ⭐ Notable Talent → 🌟 Bona Fide Star →
+🏆 Hollywood Legend → 👑 Immortal Icon
+
+A sufficiently storied career is honored with a **🎖️ Lifetime Achievement Award**.
+The ending screen shows a full legacy scorecard.
 
 **Watch the money.** Weekly living costs never stop. Go broke and your career
 ends — work side jobs to stay afloat between gigs.

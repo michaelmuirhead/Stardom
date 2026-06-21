@@ -1,9 +1,10 @@
 // ui.js — rendering & event wiring
-import { CLASSES, GENRES, GENRE_KEYS, fameTier, AWARD_NAME } from './data.js';
+import { CLASSES, GENRES, GENRE_KEYS, CEREMONIES, MILESTONES, fameTier } from './data.js';
 import {
-  audition, auditionChance, takeClass, network, rest, sideJob, toggleAgent,
-  writeScript, sellScript, startProduction, advanceWeek, isBusy, BUDGET_TIERS,
-  catchUp, quitSeries, specialty, diffOf,
+  audition, auditionChance, takeClass, network, rest, sideJob, extraWork, toggleAgent,
+  writeScript, sellScript, startProduction, estimateProduction, advanceWeek, isBusy, BUDGET_TIERS,
+  catchUp, quitSeries, specialty, diffOf, agentReady, AGENT_FAME_REQ, AGENT_CREDITS_REQ,
+  retire, careerLegacy, checkMilestones, typecastInfo,
 } from './engine.js';
 
 let S = null;        // current game state
@@ -28,6 +29,9 @@ export function bindUI(state, mutateCb) {
 
 function act(result) {
   if (result && result.msg) toast(result.msg, result.ok === false ? 'bad' : 'good');
+  // Surface any milestones completed by this action.
+  const done = checkMilestones(S);
+  if (done.length) toast(`🎯 ${done[0].icon} ${done[0].name}!`, 'good');
   if (onMutate) onMutate(S);
   render();
 }
@@ -84,7 +88,7 @@ function renderBanner() {
     parts.push(card);
   }
   for (const p of S.productions) {
-    parts.push(progressCard(`🎥 Producing "${p.title}" (${p.budgetName})`, p.totalWeeks - p.weeksLeft, p.totalWeeks, `${p.weeksLeft} wk left`));
+    parts.push(progressCard(`${p.genreIcon || '🎥'} Producing "${p.title}" (${p.budgetName})`, p.totalWeeks - p.weeksLeft, p.totalWeeks, `${p.weeksLeft} wk left`));
   }
   if (!parts.length) {
     b.appendChild(el('div', 'banner-idle', '🟢 You\'re free this week — audition, train, or create.'));
@@ -105,6 +109,7 @@ function progressCard(label, done, total, right, sub) {
 // ---- Tabs ------------------------------------------------------------------
 const TABS = [
   ['auditions', '🎟️ Auditions'],
+  ['goals', '🎯 Goals'],
   ['train', '📚 Train'],
   ['create', '🎬 Create'],
   ['people', '👥 People'],
@@ -126,6 +131,7 @@ function renderPanel() {
   p.innerHTML = '';
   if (S.gameOver) { p.appendChild(gameOverView()); return; }
   if (activeTab === 'auditions') p.appendChild(auditionsView());
+  else if (activeTab === 'goals') p.appendChild(goalsView());
   else if (activeTab === 'train') p.appendChild(trainView());
   else if (activeTab === 'create') p.appendChild(createView());
   else if (activeTab === 'people') p.appendChild(peopleView());
@@ -137,23 +143,36 @@ function auditionsView() {
   const wrap = el('div', 'view');
   // Quick actions
   const quick = el('div', 'quick');
+  quick.appendChild(actionBtn('🎬 Extra work (+$, +craft)', () => act(extraWork(S)), isBusy(S) || S.energy < 14));
+  quick.appendChild(actionBtn('🍽️ Side job (+$)', () => act(sideJob(S)), S.energy < 20));
   quick.appendChild(actionBtn('😴 Rest (+energy)', () => act(rest(S))));
   quick.appendChild(actionBtn('🥂 Network (+rep)', () => act(network(S)), S.energy < 15));
-  quick.appendChild(actionBtn('🍽️ Side job (+$)', () => act(sideJob(S)), S.energy < 20));
+  const aReq = agentReady(S);
   quick.appendChild(actionBtn(
-    S.hasAgent ? '👋 Drop agent' : '🕴️ Get agent',
+    S.hasAgent ? '👋 Drop agent' : '🕴️ Sign an agent',
     () => act(toggleAgent(S)),
-    !S.hasAgent && S.fame < 12,
+    !S.hasAgent && !aReq.met,
   ));
   wrap.appendChild(quick);
 
-  wrap.appendChild(el('h2', null, 'Casting Board'));
+  // Early-game direction: progress toward representation.
+  if (!S.hasAgent) {
+    const fameOk = S.fame >= AGENT_FAME_REQ;
+    const credOk = aReq.credits >= AGENT_CREDITS_REQ;
+    const tip = el('div', 'agent-goal');
+    tip.innerHTML = `🕴️ <b>Goal: land an agent</b> — they unlock studio films & series TV.
+      <span class="${fameOk ? 'good' : 'bad'}">Fame ${Math.floor(S.fame)}/${AGENT_FAME_REQ}</span> ·
+      <span class="${credOk ? 'good' : 'bad'}">Credits ${aReq.credits}/${AGENT_CREDITS_REQ}</span>`;
+    wrap.appendChild(tip);
+  }
+
+  wrap.appendChild(el('h2', null, S.hasAgent ? 'Casting Board' : 'Open Calls'));
   if (isBusy(S)) {
     wrap.appendChild(el('p', 'muted', 'You\'re committed to a project — finish it before taking new acting roles. Advance the week to make progress.'));
     return wrap;
   }
   if (!S.offers.length) {
-    wrap.appendChild(el('p', 'muted', 'No auditions available. Network or advance the week for new listings.'));
+    wrap.appendChild(el('p', 'muted', 'No auditions on the board. Take extra work to keep the lights on and build craft, network for new leads, or advance the week.'));
     return wrap;
   }
   const grid = el('div', 'grid');
@@ -165,11 +184,12 @@ function auditionsView() {
 function roleCard(r) {
   const chance = Math.round(auditionChance(S, r) * 100);
   const chCls = chance >= 60 ? 'good' : chance >= 30 ? 'mid' : 'bad';
-  const c = el('div', 'card');
+  const c = el('div', 'card' + (r.callback ? ' callback' : ''));
   c.innerHTML = `
+    ${r.callback ? '<div class="badge">📞 Callback — they liked you</div>' : ''}
     <div class="card-head"><span class="card-ic">${r.icon}</span>
       <div><div class="card-title">${r.title}</div>
-      <div class="muted small">${r.genreIcon} ${r.genreName} ${r.catName} · ${r.part}</div></div></div>
+      <div class="muted small">${r.genreIcon} ${r.genreName} ${r.catName} · ${r.part}${r.openCall ? ' · 📭 open call' : ''}</div></div></div>
     <div class="reqs">
       <span>💵 ${money(r.pay)}</span>
       <span>⭐ +${r.fameGain}</span>
@@ -180,10 +200,19 @@ function roleCard(r) {
       <span>Needs acting ${r.skillReq}</span>
       <span>Needs fame ${r.fameReq}</span>
     </div>
-    <div class="chance ${chCls}">Audition odds: ${chance}%</div>`;
-  const btn = actionBtn('🎟️ Audition (18⚡)', () => act(audition(S, r.id)), S.energy < 18);
+    <div class="chance ${chCls}">Audition odds: ${chance}%</div>
+    ${offTypeNote(r)}`;
+  const btn = actionBtn(r.callback ? '🎟️ Callback audition (18⚡)' : '🎟️ Audition (18⚡)',
+    () => act(audition(S, r.id)), S.energy < 18);
   c.appendChild(btn);
   return c;
+}
+
+function offTypeNote(r) {
+  const tc = typecastInfo(S);
+  if (!tc.genre || tc.degree <= 0) return '';
+  if (r.genre === tc.genre) return `<div class="muted small">🎯 On-brand for your ${GENRES[tc.genre].name} image.</div>`;
+  return `<div class="bad small">⚠️ Against type — you're known for ${GENRES[tc.genre].name} (−${Math.round(tc.degree * 15)}% odds).</div>`;
 }
 
 // ---- Train view ------------------------------------------------------------
@@ -233,8 +262,8 @@ function createView() {
     for (const sc of S.scripts) {
       const card = el('div', 'card');
       card.innerHTML = `<div class="card-title">📄 ${sc.title}</div>
-        <div class="muted small">Quality ${sc.quality}</div>`;
-      card.appendChild(actionBtn('💰 Sell to studio', () => act(sellScript(S, sc.id))));
+        <div class="muted small">${sc.genreIcon ? sc.genreIcon + ' ' + sc.genreName + ' · ' : ''}Quality ${sc.quality}</div>`;
+      card.appendChild(actionBtn(`💰 Sell to studio (~${money(sc.quality * 220)})`, () => act(sellScript(S, sc.id))));
       grid.appendChild(card);
     }
     wrap.appendChild(grid);
@@ -269,7 +298,7 @@ function producerForm() {
   none.value = '';
   sSel.appendChild(none);
   for (const sc of S.scripts) {
-    const o = el('option', null, `${sc.title} (Q${sc.quality})`);
+    const o = el('option', null, `${sc.genreIcon ? sc.genreIcon + ' ' : ''}${sc.title} (Q${sc.quality})`);
     o.value = sc.id;
     sSel.appendChild(o);
   }
@@ -280,16 +309,38 @@ function producerForm() {
   const dirBox = document.createElement('input');
   dirBox.type = 'checkbox';
   dirBox.disabled = S.directing < 5;
-  dirBox.onchange = () => { state.direct = dirBox.checked; };
+  dirBox.onchange = () => { state.direct = dirBox.checked; update(); };
   dirLabel.appendChild(dirBox);
   dirLabel.appendChild(document.createTextNode(
     S.directing < 5 ? ' Also direct (needs directing 5+)' : ' Also direct it (+prestige)'));
 
+  // Live projection + affordability-gated greenlight
+  const preview = el('div', 'estimate');
+  const go = el('button', 'btn primary', '🎬 Greenlight production');
+  go.onclick = () => act(startProduction(S, state));
+  bSel.onchange = () => { state.budgetKey = bSel.value; update(); };
+  sSel.onchange = () => { state.scriptId = sSel.value; update(); };
+
+  function update() {
+    const est = estimateProduction(S, state);
+    if (!est) { preview.innerHTML = ''; return; }
+    const profit = est.grossExp - est.cost;
+    go.disabled = !est.affordable;
+    preview.innerHTML = `
+      <div class="est-row"><span>Projected quality</span><span>${est.qLow}–${est.qHigh} <span class="muted">(~${est.qExp})</span></span></div>
+      <div class="est-row"><span>Budget</span><span>${money(est.cost)}</span></div>
+      <div class="est-row"><span>Projected box office</span><span>~${money(est.grossExp)}</span></div>
+      <div class="est-row ${profit >= 0 ? 'good' : 'bad'}"><span>Projected profit</span><span>${profit >= 0 ? '+' : ''}${money(profit)}</span></div>
+      ${est.affordable ? '' : '<div class="bad small">You can\'t afford this budget yet.</div>'}`;
+  }
+
   block.appendChild(labeled('Budget', bSel));
   block.appendChild(labeled('Script', sSel));
   block.appendChild(dirLabel);
-  block.appendChild(actionBtn('🎬 Greenlight production', () => act(startProduction(S, state))));
-  block.appendChild(el('p', 'muted small', 'Producing ties up no energy but locks in your money. Quality (and box office) depend on your script, producing skill, and—if you direct—your directing skill.'));
+  block.appendChild(preview);
+  block.appendChild(go);
+  block.appendChild(el('p', 'muted small', 'Producing ties up no energy but locks in your money. Projections ignore luck — actual results swing higher or lower. Each production also builds your affinity in its genre.'));
+  update();
   return block;
 }
 
@@ -298,6 +349,40 @@ function labeled(label, node) {
   w.appendChild(el('span', 'field-lab', label));
   w.appendChild(node);
   return w;
+}
+
+// ---- Goals view (milestones) -----------------------------------------------
+function goalsView() {
+  const wrap = el('div', 'view');
+  const done = MILESTONES.filter((m) => S.milestonesDone[m.key]);
+  const pending = MILESTONES.filter((m) => !S.milestonesDone[m.key]);
+  wrap.appendChild(el('h2', null, `🎯 Career Goals — ${done.length}/${MILESTONES.length}`));
+  wrap.appendChild(el('p', 'muted small', 'Milestones chart your rise from unknown to icon. Each grants a small reward when reached.'));
+
+  if (pending.length) {
+    wrap.appendChild(el('h3', null, 'Up Next'));
+    const grid = el('div', 'grid');
+    for (const m of pending) grid.appendChild(goalCard(m, false));
+    wrap.appendChild(grid);
+  }
+  if (done.length) {
+    wrap.appendChild(el('h3', null, '✅ Achieved'));
+    const grid = el('div', 'grid');
+    for (const m of done) grid.appendChild(goalCard(m, true));
+    wrap.appendChild(grid);
+  }
+  return wrap;
+}
+
+function goalCard(m, complete) {
+  const r = m.reward || {};
+  const reward = [r.money ? `+$${r.money}` : null, r.rep ? `+${r.rep} rep` : null, r.fame ? `+${r.fame} fame` : null].filter(Boolean).join(' · ');
+  const card = el('div', 'card goal' + (complete ? ' goal-done' : ''));
+  card.innerHTML = `<div class="card-head"><span class="card-ic">${complete ? '✅' : m.icon}</span>
+    <div><div class="card-title">${m.name}</div>
+    <div class="muted small">${m.desc}</div></div></div>
+    ${reward ? `<div class="muted small">Reward: ${reward}${complete && S.milestonesDone[m.key] ? ` · <span class="good">done Yr ${S.milestonesDone[m.key]}</span>` : ''}</div>` : ''}`;
+  return card;
 }
 
 // ---- People view (co-stars & relationships) --------------------------------
@@ -366,25 +451,30 @@ function careerView() {
     gskills.appendChild(row);
   }
   wrap.appendChild(gskills);
-  wrap.appendChild(el('p', 'muted small', 'More experience in a genre raises your audition odds for similar roles — and defines your public brand.'));
+  const tc = typecastInfo(S);
+  if (tc.genre && tc.degree > 0) {
+    const sev = tc.degree > 0.6 ? 'bad' : 'mid';
+    wrap.appendChild(el('p', `small ${sev === 'bad' ? 'chance bad' : ''}`,
+      `🎭 <b>Typecast</b> as a ${GENRES[tc.genre].icon} ${GENRES[tc.genre].name} actor (${Math.round(tc.share * 100)}% of your work). ` +
+      `Casting against type is ${Math.round(tc.degree * 15)}% harder. Work other genres to broaden your range.`));
+  } else {
+    wrap.appendChild(el('p', 'muted small', 'More experience in a genre raises your audition odds for similar roles — and defines your public brand. Spread too thin in one and you risk being typecast.'));
+  }
 
   const meta = el('div', 'meta-row');
   meta.innerHTML = `<span>Agent: ${S.hasAgent ? '✅ Signed' : '— None'}</span>
+    <span>💵 Net worth: ${money(S.money)}</span>
+    <span>🏅 Career prestige: ${Math.round(S.careerPrestige || 0)}</span>
     <span>Auditions: ${S.stats.auditions}</span>
     <span>Roles landed: ${S.stats.landed}</span>
+    <span>Extra gigs: ${S.stats.extra || 0}</span>
     <span>TV seasons: ${S.stats.seasons || 0}</span>
+    <span>Scripts sold: ${(S.writingCredits || []).length}</span>
     <span>Contacts: ${S.contacts.length}</span>
     <span>Classes: ${S.stats.classes}</span>`;
   wrap.appendChild(meta);
 
-  // Awards
-  wrap.appendChild(el('h3', null, `🏆 ${AWARD_NAME} Awards (${S.awards.length})`));
-  if (!S.awards.length) wrap.appendChild(el('p', 'muted', 'No wins yet. Do prestigious work to earn nominations at year\'s end.'));
-  else {
-    const ul = el('ul', 'list');
-    for (const a of S.awards) ul.appendChild(el('li', null, `🏆 ${a.name} (Yr ${a.year}) — ${a.project}`));
-    wrap.appendChild(ul);
-  }
+  wrap.appendChild(awardsSection());
 
   // Filmography
   wrap.appendChild(el('h3', null, `🎞️ Filmography (${S.filmography.length})`));
@@ -392,22 +482,141 @@ function careerView() {
   else {
     const ul = el('ul', 'list');
     for (const f of [...S.filmography].reverse()) {
-      ul.appendChild(el('li', null, `<b>${f.title}</b> — ${f.role} <span class="muted">(${f.category}, Yr ${f.year})</span>`));
+      ul.appendChild(el('li', null, `<b>${f.title}</b> — ${f.role} <span class="muted">(${f.genre ? f.genre + ' ' : ''}${f.category}, Yr ${f.year})</span>${f.quality != null ? ` <span class="qchip">★ ${f.quality}</span>` : ''}`));
     }
+    wrap.appendChild(ul);
+  }
+
+  // Retirement: cement your legacy and end the game on your own terms.
+  const leg = careerLegacy(S);
+  const retireBlock = el('div', 'panel-block retire-block');
+  retireBlock.innerHTML = `<p>🎬 <b>Retire</b> — end your career and take your place in history.
+    <span class="muted">Current legacy: ${leg.rank.icon} ${leg.rank.label} (${leg.score})${leg.lifetimeAchievement ? ' · 🎖️ Lifetime Achievement eligible' : ''}</span></p>`;
+  retireBlock.appendChild(actionBtn('🎬 Retire & cement your legacy', () => {
+    if (window.confirm('Retire for good? This ends your career and shows your final legacy.')) act(retire(S));
+  }));
+  wrap.appendChild(retireBlock);
+  return wrap;
+}
+
+// ---- Awards & nominations --------------------------------------------------
+function awardsSection() {
+  const wrap = el('div');
+  const wins = S.awards.filter((a) => a.won);
+  const noms = S.awards.filter((a) => !a.won);
+  wrap.appendChild(el('h3', null, `🏆 Awards — ${wins.length} win${wins.length === 1 ? '' : 's'}, ${noms.length} nomination${noms.length === 1 ? '' : 's'}`));
+
+  if (!S.awards.length) {
+    wrap.appendChild(el('p', 'muted', 'No nominations yet. Awards go to prestigious work — strong films, acclaimed TV, and projects you direct or produce. Commercials don\'t count.'));
+    const cal = el('div', 'awards-cal');
+    for (const c of CEREMONIES) {
+      cal.appendChild(el('div', 'cal-chip', `${c.icon} ${c.name} <span class="muted">· wk ${c.week}</span>`));
+    }
+    wrap.appendChild(cal);
+    return wrap;
+  }
+
+  // Group by ceremony, in calendar order.
+  for (const cer of CEREMONIES) {
+    const mine = S.awards.filter((a) => a.ceremonyKey === cer.key);
+    if (!mine.length) continue;
+    const w = mine.filter((a) => a.won).length;
+    wrap.appendChild(el('h4', 'award-head', `${cer.icon} ${cer.name} <span class="muted">— ${w} win${w === 1 ? '' : 's'} / ${mine.length} nom${mine.length === 1 ? '' : 's'}</span>`));
+    const ul = el('ul', 'list');
+    for (const a of [...mine].reverse()) {
+      ul.appendChild(el('li', a.won ? 'award-win' : '',
+        `${a.won ? '🥇' : '🎗️'} <b>${a.category}</b> — ${a.project} <span class="muted">(Yr ${a.year})</span>`));
+    }
+    wrap.appendChild(ul);
+  }
+  // Any legacy awards from older saves (pre-ceremony format).
+  const legacy = S.awards.filter((a) => !a.ceremonyKey);
+  if (legacy.length) {
+    const ul = el('ul', 'list');
+    for (const a of legacy) ul.appendChild(el('li', null, `🏆 ${a.name || a.category || 'Award'} <span class="muted">(Yr ${a.year})</span> — ${a.project || ''}`));
     wrap.appendChild(ul);
   }
   return wrap;
 }
 
-// ---- Game over -------------------------------------------------------------
+// ---- Game over / retirement ------------------------------------------------
 function gameOverView() {
   const v = el('div', 'view gameover');
-  v.appendChild(el('h2', null, '💀 Game Over'));
-  v.appendChild(el('p', null, `${S.name}'s acting career has come to an end after ${S.year} year(s).`));
-  v.appendChild(el('p', 'muted', `Peak fame: ${S.fame.toFixed(0)} (${fameTier(S.fame)}) · ${S.filmography.length} credits · ${S.awards.length} ${AWARD_NAME} award(s).`));
+  const retired = S.gameOverReason === 'retired';
+  const leg = S.legacy || careerLegacy(S);
+
+  v.appendChild(el('div', 'hof-rank', `${leg.rank.icon}`));
+  v.appendChild(el('h2', null, retired
+    ? `${S.name} — ${leg.rank.label}`
+    : '💀 Career Over'));
+  v.appendChild(el('p', null, retired
+    ? `After ${S.year} year(s) in the business, you retire and take your place in the Hall of Fame.`
+    : `${S.name} went broke and left the business after ${S.year} year(s).`));
+
+  if (retired && leg.lifetimeAchievement) {
+    v.appendChild(el('div', 'lifetime', '🎖️ Honored with a <b>Lifetime Achievement Award</b> for a storied career.'));
+  }
+
+  // Legacy scorecard
+  const wins = S.awards.filter((a) => a.won).length;
+  const noms = S.awards.filter((a) => !a.won).length;
+  const grid = el('div', 'hof-grid');
+  const stat = (lab, val) => `<div class="hof-stat"><span class="hof-val">${val}</span><span class="hof-lab">${lab}</span></div>`;
+  grid.innerHTML = stat('Legacy score', leg.score)
+    + stat('Peak fame', `${S.fame.toFixed(0)}`)
+    + stat('Award wins', wins)
+    + stat('Nominations', noms)
+    + stat('Oscar wins', leg.oscarWins)
+    + stat('Credits', S.filmography.length)
+    + stat('Career prestige', Math.round(S.careerPrestige || 0))
+    + stat('Final net worth', money(S.money));
+  v.appendChild(grid);
+
+  // Hall of Fame ladder
+  v.appendChild(el('p', 'muted small', `Hall of Fame rank: ${leg.rank.icon} ${leg.rank.label}`));
+
   const btn = actionBtn('🔄 Start a new career', () => { if (window.__stardomNewGame) window.__stardomNewGame(); });
   v.appendChild(btn);
   return v;
+}
+
+// ---- Awards-night summary modal --------------------------------------------
+function renderCeremonyModal() {
+  const existing = document.querySelector('#modal');
+  if (existing) existing.remove();
+  const night = S.ceremonyNight;
+  if (!night || S.gameOver) return;
+
+  const overlay = el('div', 'modal-overlay');
+  overlay.id = 'modal';
+  const card = el('div', 'modal-card');
+  const won = night.wins > 0;
+  card.appendChild(el('div', 'modal-ic', night.icon));
+  card.appendChild(el('h2', null, `${night.name}`));
+  card.appendChild(el('p', 'muted', `Awards Night · Year ${night.year}`));
+
+  const ul = el('ul', 'list modal-list');
+  for (const r of night.results) {
+    const react = (r.reactions && r.reactions.length)
+      ? `<div class="muted small">${r.won ? '🤝 Celebrating with' : '👏 Supported by'} ${r.reactions.slice(0, 3).join(', ')}</div>`
+      : '';
+    ul.appendChild(el('li', r.won ? 'award-win' : '',
+      `${r.won ? '🥇 WON' : '🎗️ Nominated'} — <b>${r.category}</b> <span class="muted">(${r.project})</span>${react}`));
+  }
+  card.appendChild(ul);
+  card.appendChild(el('p', won ? 'modal-headline good' : 'modal-headline',
+    won ? `🎉 ${night.wins} win${night.wins === 1 ? '' : 's'} tonight!` : 'A nomination is its own honor.'));
+
+  const btn = actionBtn('Continue', () => {
+    S.ceremonyNight = null;
+    if (onMutate) onMutate(S);
+    overlay.remove();
+    render();
+  });
+  btn.classList.add('primary');
+  card.appendChild(btn);
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
 }
 
 // ---- Log -------------------------------------------------------------------
@@ -437,4 +646,5 @@ export function render() {
   const adv = $('#advance');
   adv.disabled = S.gameOver;
   adv.onclick = () => { advanceWeek(S); act({ ok: true }); };
+  renderCeremonyModal();
 }

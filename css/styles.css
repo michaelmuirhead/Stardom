@@ -140,12 +140,29 @@ main {
 .card-title { font-weight: 700; }
 .reqs { display: flex; gap: 12px; flex-wrap: wrap; }
 .reqs span { white-space: nowrap; }
+.card.callback { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; }
+.badge {
+  align-self: flex-start; font-size: 11px; font-weight: 700;
+  background: #2a2718; color: var(--gold2); border: 1px solid var(--gold);
+  border-radius: 999px; padding: 2px 10px;
+}
 .chance { font-weight: 700; font-size: 13px; }
 .chance.good { color: var(--good); }
 .chance.mid { color: var(--mid); }
 .chance.bad { color: var(--bad); }
 
 .quick { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+
+/* Goals / milestones */
+.card.goal-done { opacity: .72; border-color: var(--good); }
+.card.goal-done .card-title { text-decoration: none; color: var(--good); }
+
+.agent-goal {
+  background: #221c10; border: 1px solid var(--gold);
+  border-radius: 10px; padding: 10px 14px; margin-bottom: 16px; font-size: 14px;
+}
+.agent-goal .good { color: var(--good); font-weight: 700; }
+.agent-goal .bad { color: var(--bad); font-weight: 700; }
 
 /* ---- Bars ---- */
 .bar { background: #14152099; border: 1px solid var(--line); border-radius: 8px; height: 8px; overflow: hidden; }
@@ -168,6 +185,29 @@ main {
   background: var(--card); color: var(--txt); border: 1px solid var(--line); font-size: 14px;
 }
 .check { display: flex; align-items: center; gap: 8px; margin: 8px 0 14px; color: var(--txt); }
+
+/* Production projection */
+.estimate {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 10px; padding: 10px 14px; margin: 4px 0 14px;
+}
+.est-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 14px; }
+.est-row.good span:last-child { color: var(--good); font-weight: 700; }
+.est-row.bad span:last-child { color: var(--bad); font-weight: 700; }
+
+/* Awards */
+.award-head { margin: 16px 0 6px; font-size: 14px; }
+.award-win { border-color: var(--gold) !important; background: #221c10; }
+.awards-cal { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.cal-chip {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 999px; padding: 5px 12px; font-size: 13px;
+}
+
+.qchip {
+  font-size: 11px; font-weight: 700; color: var(--gold2);
+  background: #2a2718; border: 1px solid var(--line); border-radius: 999px; padding: 1px 7px;
+}
 
 /* ---- Log ---- */
 .log {
@@ -209,7 +249,43 @@ footer {
 .toast.good { border-color: var(--good); }
 .toast.bad { border-color: var(--bad); }
 
-.gameover { text-align: center; padding: 40px 0; }
+.gameover { text-align: center; padding: 30px 0; }
+.hof-rank { font-size: 64px; line-height: 1; margin-bottom: 4px; }
+.lifetime {
+  background: #221c10; border: 1px solid var(--gold); border-radius: 10px;
+  padding: 10px 16px; margin: 12px auto; max-width: 460px; color: var(--gold2);
+}
+.hof-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+  max-width: 620px; margin: 18px auto;
+}
+@media (max-width: 560px) { .hof-grid { grid-template-columns: repeat(2, 1fr); } }
+.hof-stat {
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  padding: 12px 8px; display: flex; flex-direction: column; gap: 2px;
+}
+.hof-val { font-size: 20px; font-weight: 800; color: var(--gold2); }
+.hof-lab { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+
+.retire-block { margin-top: 22px; border-style: dashed; }
+
+/* Awards-night modal */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, .72);
+  display: grid; place-items: center; z-index: 50; padding: 20px;
+  animation: fade .2s ease;
+}
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+.modal-card {
+  background: var(--bg2); border: 1px solid var(--gold); border-radius: 16px;
+  padding: 28px; max-width: 460px; width: 100%; text-align: center;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .6);
+}
+.modal-ic { font-size: 48px; }
+.modal-card h2 { margin: 6px 0 2px; }
+.modal-list { text-align: left; margin: 16px 0; }
+.modal-headline { font-weight: 700; font-size: 17px; margin: 8px 0 16px; }
+.modal-headline.good { color: var(--gold2); }
 
 .muted { color: var(--muted); }
 .small { font-size: 12px; }

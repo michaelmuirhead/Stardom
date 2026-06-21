@@ -5,7 +5,8 @@ import { newGame } from '../js/state.js';
 import { DIFFICULTIES, GENRE_KEYS } from '../js/data.js';
 import {
   advanceWeek, audition, auditionChance, takeClass, network, rest, sideJob,
-  toggleAgent, writeScript, startProduction, isBusy, catchUp, quitSeries,
+  extraWork, toggleAgent, writeScript, startProduction, isBusy, catchUp, quitSeries,
+  agentReady,
 } from '../js/engine.js';
 
 let failures = 0;
@@ -26,7 +27,7 @@ function checkIntegrity(s, where) {
 // A reasonably competent AI so easy/normal careers don't bankrupt on noise.
 function playCareer(diffKey, weeks) {
   const s = newGame('CI Bot', diffKey);
-  const seen = { series: false, romance: false, cancellation: false, renewal: false };
+  const seen = { series: false, romance: false, cancellation: false, renewal: false, callback: false, extra: false };
   let logLen = 0;
 
   for (let i = 0; i < weeks && !s.gameOver; i++) {
@@ -36,12 +37,13 @@ function playCareer(diffKey, weeks) {
     if (s.energy < 22) {
       rest(s);
     } else if (!isBusy(s) && s.offers.length) {
+      const cb = s.offers.find((o) => o.callback);
       const ranked = [...s.offers].sort((a, b) => auditionChance(s, b) * b.pay - auditionChance(s, a) * a.pay);
-      const best = ranked[0];
+      const best = cb || ranked[0];
       if (s.money < 1000) sideJob(s);
-      else if (best && auditionChance(s, best) > 0.3) audition(s, best.id);
-      else if (s.money > 800 && s.energy >= 25) takeClass(s, 'acting');
-      else sideJob(s);
+      else if (best && auditionChance(s, best) > 0.25) audition(s, best.id);
+      else if (s.money > 1500 && s.energy >= 25 && Math.random() < 0.4) takeClass(s, 'acting');
+      else extraWork(s);
     } else if (s.money < 600) {
       sideJob(s);
     } else if (s.money > 800 && s.energy >= 25 && Math.random() < 0.4) {
@@ -68,12 +70,67 @@ function playCareer(diffKey, weeks) {
     logLen = Math.min(s.log.length, 80);
   }
 
-  // Detect renewal / cancellation by scanning the log.
+  // Detect renewal / cancellation / callbacks by scanning the log.
   for (const e of s.log) {
     if (/RENEWED/.test(e.msg)) seen.renewal = true;
     if (/CANCELLED/.test(e.msg)) seen.cancellation = true;
+    if (/Callback/.test(e.msg)) seen.callback = true;
   }
+  if ((s.stats.extra || 0) > 0) seen.extra = true;
   return { s, seen };
+}
+
+// A focused early-game burst that auditions heavily, to reliably exercise the
+// callback mechanic (which depends on near-miss losses over many attempts).
+function exerciseEarly() {
+  const s = newGame('Rookie', 'normal');
+  let callbacks = 0, auditioned = 0;
+  for (let i = 0; i < 160 && !s.gameOver; i++) {
+    checkIntegrity(s, `early wk${i}`);
+    if (s.energy < 20) { rest(s); advanceWeek(s); continue; }
+    if (!isBusy(s) && s.offers.length) {
+      const r = audition(s, s.offers[0].id);
+      auditioned++;
+      if (r.callback) callbacks++;
+    } else if (!isBusy(s)) {
+      network(s);
+    } else {
+      // committed to a project — just let it play out
+    }
+    advanceWeek(s);
+  }
+  // Pre-agent, the board must only show open-call roles.
+  const preAgentBoardOk = !s.hasAgent ? s.offers.every((o) => o.openCall) : true;
+  return { callbacks, auditioned, preAgentBoardOk, hasAgent: s.hasAgent };
+}
+
+// A long, competent career to observe awards-season outcomes.
+function exerciseAwards(years) {
+  const s = newGame('Laureate', 'normal');
+  for (let i = 0; i < years * 52 && !s.gameOver; i++) {
+    if (!s.hasAgent && agentReady(s).met) toggleAgent(s);
+    if (s.energy < 22) { rest(s); advanceWeek(s); continue; }
+    if (!isBusy(s) && s.offers.length) {
+      const cb = s.offers.find((o) => o.callback);
+      const t = cb || [...s.offers].sort((a, b) => auditionChance(s, b) * b.pay - auditionChance(s, a) * a.pay)[0];
+      if (s.money < 1000) sideJob(s);
+      else if (t && auditionChance(s, t) > 0.25) audition(s, t.id);
+      else if (s.money > 1500 && s.energy >= 25) takeClass(s, 'acting');
+      else extraWork(s);
+    } else if (s.money < 600) { sideJob(s); }
+    else if (s.money > 1500 && s.energy >= 25 && Math.random() < 0.4) { takeClass(s, 'acting'); }
+    else if (!isBusy(s)) { network(s); } else { rest(s); }
+    if (s.fame >= 15 && s.money > 1500 && s.energy >= 30 && Math.random() < 0.05) takeClass(s, 'directing');
+    if (s.fame >= 25 && s.money > 2000 && s.energy >= 30 && Math.random() < 0.05) takeClass(s, 'producing');
+    if (s.producing >= 5 && s.money > 35000 && !s.productions.length) {
+      startProduction(s, { budgetKey: 'mid', scriptId: '', direct: s.directing >= 5 });
+    }
+    advanceWeek(s);
+  }
+  return {
+    wins: s.stats.wins || 0, noms: s.stats.noms || 0, years, fame: s.fame,
+    milestones: Object.keys(s.milestonesDone || {}).length,
+  };
 }
 
 console.log('Stardom engine smoke test\n');
@@ -85,7 +142,7 @@ for (const d of Object.values(DIFFICULTIES)) {
 }
 
 // 2) Run careers per difficulty
-const agg = { series: false, romance: false, renewal: false, cancellation: false, landed: 0 };
+const agg = { series: false, romance: false, renewal: false, cancellation: false, callback: false, extra: false, landed: 0 };
 for (const diffKey of Object.keys(DIFFICULTIES)) {
   // Run several times to smooth out RNG and exercise the systems.
   let survived = 0;
@@ -108,6 +165,21 @@ assert(agg.series, 'TV series system engaged (joined a series)');
 assert(agg.renewal, 'TV series renewals occurred');
 assert(agg.cancellation, 'TV series cancellations occurred');
 assert(agg.romance, 'co-star romance system engaged');
+assert(agg.extra, 'extra/background work was performed');
+
+// 4) Early-game mechanics: callbacks + open-call board gating
+const early = exerciseEarly();
+console.log(`  early burst: ${early.auditioned} auditions, ${early.callbacks} callbacks`);
+assert(early.callbacks > 0, 'audition callbacks occurred in early-game burst');
+assert(early.preAgentBoardOk, 'pre-agent board only shows open-call roles');
+
+// 5) Awards season fires and produces realistic (non-runaway) outcomes
+const YEARS = 15;
+const aw = exerciseAwards(YEARS);
+console.log(`  awards (${YEARS}yr legend): ${aw.wins} wins, ${aw.noms} nominations, ${aw.milestones} milestones`);
+assert(aw.wins + aw.noms > 0, 'awards season produced nominations/wins over a long career');
+assert(aw.wins < YEARS, `award wins are realistic, not runaway (${aw.wins} over ${YEARS}yr)`);
+assert(aw.milestones >= 6, `career milestones are completed over a long career (${aw.milestones})`);
 
 console.log('');
 if (failures) {

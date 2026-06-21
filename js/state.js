@@ -18,6 +18,7 @@ export function newGame(playerName, difficultyKey) {
     active: null,        // acting role in production: {role, weeksLeft, costars}
     activeSeries: null,  // ongoing TV series (renewal/cancellation arc)
     scripts: [],         // written scripts available to produce/shop
+    writingCredits: [],  // sold screenplays (Oscar-eligible, not on-screen credits)
     productions: [],      // self-produced projects in progress
     filmography: [],     // completed credits {title, category, year, role}
     awards: [],          // {name, year, project}
@@ -26,8 +27,9 @@ export function newGame(playerName, difficultyKey) {
     contacts: [],        // co-stars & industry relationships
     partner: null,       // current romantic partner (contact id)
 
-    yearPrestige: 0,     // prestige accumulated this year (for award season)
-    stats: { auditions: 0, landed: 0, classes: 0, seasons: 0 },
+    careerPrestige: 0,   // cumulative prestige across your whole career
+    milestonesDone: {},  // milestone key -> year completed
+    stats: { auditions: 0, landed: 0, classes: 0, seasons: 0, wins: 0, noms: 0, written: 0, extra: 0 },
     gameOver: false,
     log: [],
   };
@@ -46,7 +48,7 @@ function structuredCloneSafe(o) {
 
 export function refreshOffers(s) {
   const count = 4 + (s.hasAgent ? 2 : 0);
-  s.offers = Array.from({ length: count }, () => makeRole(s.fame));
+  s.offers = Array.from({ length: count }, () => makeRole(s.fame, !s.hasAgent));
 }
 
 export function pushLog(s, msg) {

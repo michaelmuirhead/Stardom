@@ -107,21 +107,28 @@ export function fullName() {
 }
 
 // Generate a single audition offer scaled to player fame.
-export function makeRole(playerFame) {
-  const keys = Object.keys(CATEGORIES);
+// Roles an actor can reach without representation: smaller, lower-paid gigs.
+// Studio films and series-regular TV roles only come through an agent.
+export const OPEN_CALL_CATS = ['commercial', 'tvmovie', 'indie'];
+
+export function makeRole(playerFame, openCall = false) {
+  const keys = openCall ? OPEN_CALL_CATS : Object.keys(CATEGORIES);
   // Bias category selection by what the player can plausibly reach.
   const cat = CATEGORIES[pick(keys)];
   // tier 0..2 (small/medium/large within category), gated softly by fame.
-  const tier = Math.min(2, Math.max(0, Math.round(rf(-0.4, 2.2) * (0.5 + playerFame / 100))));
+  let tier = Math.min(2, Math.max(0, Math.round(rf(-0.4, 2.2) * (0.5 + playerFame / 100))));
+  if (openCall) tier = Math.min(tier, 1);  // no marquee parts at open calls
   const mult = [0.7, 1.1, 1.8][tier];
+  // Open-call gigs (student films, local spots, day players) pay & profile less.
+  const disc = openCall ? 0.7 : 1;
 
   const skillReq = Math.round(cat.skillBase * 4 + tier * 9 + rf(-3, 5));
   const fameReq = Math.round(cat.fameBase * 1.2 + tier * 6 + rf(-2, 4));
-  const pay = Math.round(cat.payBase * mult * rf(0.8, 1.3));
-  const fameGain = +(cat.fameBase * mult * rf(0.8, 1.25)).toFixed(1);
+  const pay = Math.round(cat.payBase * mult * rf(0.8, 1.3) * disc);
+  const fameGain = +(cat.fameBase * mult * rf(0.8, 1.25) * disc).toFixed(1);
   const skillGain = +(cat.skillBase * rf(0.8, 1.4) + tier * 0.6).toFixed(1);
   const weeks = cat.weeks[tier];
-  const prestige = +(cat.prestige * mult * rf(0.7, 1.2)).toFixed(2);
+  const prestige = +(cat.prestige * mult * rf(0.7, 1.2) * disc).toFixed(2);
   const genre = pick(GENRE_KEYS);
 
   return {
@@ -131,6 +138,7 @@ export function makeRole(playerFame) {
     catName: cat.name,
     icon: cat.icon,
     part: pick(PART),
+    openCall,
     genre,
     genreName: GENRES[genre].name,
     genreIcon: GENRES[genre].icon,
@@ -219,4 +227,82 @@ export function fameTier(fame) {
   return t.label;
 }
 
-export const AWARD_NAME = 'Golden Star';
+// ---- Awards season ---------------------------------------------------------
+// Real-world ceremonies, each held at a point in the year and judging your
+// eligible credits from the trailing ~12 months. `kind` selects which work &
+// skill a category evaluates; `medium` and `lead` filter eligible credits.
+export const CEREMONIES = [
+  {
+    key: 'globes', name: 'Golden Globe Awards', icon: '🌐', week: 3, prestige: 1.0,
+    categories: [
+      { key: 'gg_film', name: 'Best Actor — Motion Picture', kind: 'acting', medium: 'film', lead: true },
+      { key: 'gg_tv', name: 'Best Actor — Television', kind: 'acting', medium: 'tv', lead: true },
+    ],
+  },
+  {
+    key: 'sag', name: 'Screen Actors Guild Awards', icon: '🎟️', week: 6, prestige: 1.05,
+    categories: [
+      { key: 'sag_film', name: 'Outstanding Performance — Film', kind: 'acting', medium: 'film' },
+      { key: 'sag_tv', name: 'Outstanding Performance — Television', kind: 'acting', medium: 'tv' },
+    ],
+  },
+  {
+    key: 'oscars', name: 'Academy Awards', icon: '🏆', week: 11, prestige: 1.6,
+    categories: [
+      { key: 'osc_actor', name: 'Best Actor', kind: 'acting', medium: 'film', lead: true },
+      { key: 'osc_supp', name: 'Best Supporting Actor', kind: 'acting', medium: 'film', lead: false },
+      { key: 'osc_writing', name: 'Best Original Screenplay', kind: 'writing', medium: 'film' },
+      { key: 'osc_dir', name: 'Best Director', kind: 'directing', medium: 'film' },
+      { key: 'osc_pic', name: 'Best Picture', kind: 'producing', medium: 'film' },
+    ],
+  },
+  {
+    key: 'emmys', name: 'Emmy Awards', icon: '📺', week: 38, prestige: 1.25,
+    categories: [
+      { key: 'emmy_lead', name: 'Outstanding Lead Actor', kind: 'acting', medium: 'tv', lead: true },
+      { key: 'emmy_supp', name: 'Outstanding Supporting Actor', kind: 'acting', medium: 'tv', lead: false },
+    ],
+  },
+];
+
+// Map a filmography credit's category label to an awards medium.
+export function creditMedium(category) {
+  if (category === 'Indie Film' || category === 'Studio Film' || category === 'Produced') return 'film';
+  if (category === 'TV Series' || category === 'TV Movie') return 'tv';
+  return 'other'; // commercials etc. are not awards-eligible
+}
+
+// ---- Legacy / Hall of Fame -------------------------------------------------
+// Tiers a career is ranked into at retirement, by legacy score.
+export const HALL_OF_FAME = [
+  { min: 0, label: 'Forgotten Extra', icon: '🎭' },
+  { min: 70, label: 'Working Actor', icon: '🎬' },
+  { min: 160, label: 'Notable Talent', icon: '⭐' },
+  { min: 300, label: 'Bona Fide Star', icon: '🌟' },
+  { min: 480, label: 'Hollywood Legend', icon: '🏆' },
+  { min: 720, label: 'Immortal Icon', icon: '👑' },
+];
+
+// Legacy score at/above this earns an honorary Lifetime Achievement Award.
+export const LIFETIME_ACHIEVEMENT_MIN = 480;
+
+// ---- Milestones / onboarding ----------------------------------------------
+// Career goals that guide the player and grant small rewards on completion.
+// `check(s)` is evaluated against game state; `reward` is applied once.
+export const MILESTONES = [
+  { key: 'first_job', icon: '🎬', name: 'First Day on Set', desc: 'Book any paying gig — even as an extra.', reward: { money: 150 }, check: (s) => (s.stats.extra || 0) > 0 || s.stats.landed > 0 },
+  { key: 'first_class', icon: '📚', name: 'Trained Up', desc: 'Take your first class.', reward: { rep: 2 }, check: (s) => s.stats.classes > 0 },
+  { key: 'first_credit', icon: '🎞️', name: 'In the Credits', desc: 'Earn your first on-screen credit.', reward: { money: 300 }, check: (s) => s.filmography.length > 0 },
+  { key: 'agent', icon: '🕴️', name: 'Represented', desc: 'Sign with a talent agent.', reward: { rep: 4 }, check: (s) => s.hasAgent },
+  { key: 'fame25', icon: '⭐', name: 'Recognizable', desc: 'Reach 25 fame.', reward: { money: 1000 }, check: (s) => s.fame >= 25 },
+  { key: 'studio_film', icon: '🎥', name: 'Studio Player', desc: 'Appear in a studio film.', reward: { rep: 5 }, check: (s) => s.filmography.some((f) => f.category === 'Studio Film' && f.acted) },
+  { key: 'tv_regular', icon: '📡', name: 'Series Regular', desc: 'Star in a season of TV.', reward: { rep: 4 }, check: (s) => (s.stats.seasons || 0) > 0 },
+  { key: 'first_script', icon: '✍️', name: 'Screenwriter', desc: 'Write your first script.', reward: { rep: 3 }, check: (s) => (s.stats.written || 0) > 0 },
+  { key: 'produce', icon: '💼', name: 'Mogul in the Making', desc: 'Produce a film.', reward: { rep: 5 }, check: (s) => s.filmography.some((f) => f.produced) },
+  { key: 'direct', icon: '🎬', name: 'Auteur', desc: 'Direct a film.', reward: { rep: 5 }, check: (s) => s.filmography.some((f) => f.directed) },
+  { key: 'first_nom', icon: '🎗️', name: 'Nominated', desc: 'Earn an awards nomination.', reward: { fame: 2 }, check: (s) => (s.stats.noms || 0) + (s.stats.wins || 0) > 0 },
+  { key: 'first_win', icon: '🥇', name: 'Award Winner', desc: 'Win an award.', reward: { fame: 4, rep: 6 }, check: (s) => (s.stats.wins || 0) > 0 },
+  { key: 'oscar', icon: '🏆', name: 'Academy Award', desc: 'Win an Academy Award.', reward: { fame: 6, rep: 8 }, check: (s) => s.awards.some((a) => a.ceremonyKey === 'oscars' && a.won) },
+  { key: 'alist', icon: '🌟', name: 'A-List', desc: 'Reach 85 fame.', reward: { rep: 5 }, check: (s) => s.fame >= 85 },
+  { key: 'millionaire', icon: '💰', name: 'Millionaire', desc: 'Bank $1,000,000.', reward: { rep: 3 }, check: (s) => s.money >= 1000000 },
+];
