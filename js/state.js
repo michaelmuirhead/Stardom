@@ -18,6 +18,7 @@ export function newGame(playerName, difficultyKey) {
     active: null,        // acting role in production: {role, weeksLeft, costars}
     activeSeries: null,  // ongoing TV series (renewal/cancellation arc)
     scripts: [],         // written scripts available to produce/shop
+    writingCredits: [],  // sold screenplays (Oscar-eligible, not on-screen credits)
     productions: [],      // self-produced projects in progress
     filmography: [],     // completed credits {title, category, year, role}
     awards: [],          // {name, year, project}

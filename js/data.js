@@ -251,6 +251,7 @@ export const CEREMONIES = [
     categories: [
       { key: 'osc_actor', name: 'Best Actor', kind: 'acting', medium: 'film', lead: true },
       { key: 'osc_supp', name: 'Best Supporting Actor', kind: 'acting', medium: 'film', lead: false },
+      { key: 'osc_writing', name: 'Best Original Screenplay', kind: 'writing', medium: 'film' },
       { key: 'osc_dir', name: 'Best Director', kind: 'directing', medium: 'film' },
       { key: 'osc_pic', name: 'Best Picture', kind: 'producing', medium: 'film' },
     ],
@@ -270,3 +271,17 @@ export function creditMedium(category) {
   if (category === 'TV Series' || category === 'TV Movie') return 'tv';
   return 'other'; // commercials etc. are not awards-eligible
 }
+
+// ---- Legacy / Hall of Fame -------------------------------------------------
+// Tiers a career is ranked into at retirement, by legacy score.
+export const HALL_OF_FAME = [
+  { min: 0, label: 'Forgotten Extra', icon: '🎭' },
+  { min: 70, label: 'Working Actor', icon: '🎬' },
+  { min: 160, label: 'Notable Talent', icon: '⭐' },
+  { min: 300, label: 'Bona Fide Star', icon: '🌟' },
+  { min: 480, label: 'Hollywood Legend', icon: '🏆' },
+  { min: 720, label: 'Immortal Icon', icon: '👑' },
+];
+
+// Legacy score at/above this earns an honorary Lifetime Achievement Award.
+export const LIFETIME_ACHIEVEMENT_MIN = 480;

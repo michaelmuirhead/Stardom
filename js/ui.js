@@ -4,6 +4,7 @@ import {
   audition, auditionChance, takeClass, network, rest, sideJob, extraWork, toggleAgent,
   writeScript, sellScript, startProduction, estimateProduction, advanceWeek, isBusy, BUDGET_TIERS,
   catchUp, quitSeries, specialty, diffOf, agentReady, AGENT_FAME_REQ, AGENT_CREDITS_REQ,
+  retire, careerLegacy,
 } from './engine.js';
 
 let S = null;        // current game state
@@ -413,6 +414,7 @@ function careerView() {
     <span>Roles landed: ${S.stats.landed}</span>
     <span>Extra gigs: ${S.stats.extra || 0}</span>
     <span>TV seasons: ${S.stats.seasons || 0}</span>
+    <span>Scripts sold: ${(S.writingCredits || []).length}</span>
     <span>Contacts: ${S.contacts.length}</span>
     <span>Classes: ${S.stats.classes}</span>`;
   wrap.appendChild(meta);
@@ -429,6 +431,16 @@ function careerView() {
     }
     wrap.appendChild(ul);
   }
+
+  // Retirement: cement your legacy and end the game on your own terms.
+  const leg = careerLegacy(S);
+  const retireBlock = el('div', 'panel-block retire-block');
+  retireBlock.innerHTML = `<p>🎬 <b>Retire</b> — end your career and take your place in history.
+    <span class="muted">Current legacy: ${leg.rank.icon} ${leg.rank.label} (${leg.score})${leg.lifetimeAchievement ? ' · 🎖️ Lifetime Achievement eligible' : ''}</span></p>`;
+  retireBlock.appendChild(actionBtn('🎬 Retire & cement your legacy', () => {
+    if (window.confirm('Retire for good? This ends your career and shows your final legacy.')) act(retire(S));
+  }));
+  wrap.appendChild(retireBlock);
   return wrap;
 }
 
@@ -472,16 +484,81 @@ function awardsSection() {
   return wrap;
 }
 
-// ---- Game over -------------------------------------------------------------
+// ---- Game over / retirement ------------------------------------------------
 function gameOverView() {
   const v = el('div', 'view gameover');
-  v.appendChild(el('h2', null, '💀 Game Over'));
-  v.appendChild(el('p', null, `${S.name}'s acting career has come to an end after ${S.year} year(s).`));
+  const retired = S.gameOverReason === 'retired';
+  const leg = S.legacy || careerLegacy(S);
+
+  v.appendChild(el('div', 'hof-rank', `${leg.rank.icon}`));
+  v.appendChild(el('h2', null, retired
+    ? `${S.name} — ${leg.rank.label}`
+    : '💀 Career Over'));
+  v.appendChild(el('p', null, retired
+    ? `After ${S.year} year(s) in the business, you retire and take your place in the Hall of Fame.`
+    : `${S.name} went broke and left the business after ${S.year} year(s).`));
+
+  if (retired && leg.lifetimeAchievement) {
+    v.appendChild(el('div', 'lifetime', '🎖️ Honored with a <b>Lifetime Achievement Award</b> for a storied career.'));
+  }
+
+  // Legacy scorecard
   const wins = S.awards.filter((a) => a.won).length;
-  v.appendChild(el('p', 'muted', `Peak fame: ${S.fame.toFixed(0)} (${fameTier(S.fame)}) · ${S.filmography.length} credits · ${wins} award win(s).`));
+  const noms = S.awards.filter((a) => !a.won).length;
+  const grid = el('div', 'hof-grid');
+  const stat = (lab, val) => `<div class="hof-stat"><span class="hof-val">${val}</span><span class="hof-lab">${lab}</span></div>`;
+  grid.innerHTML = stat('Legacy score', leg.score)
+    + stat('Peak fame', `${S.fame.toFixed(0)}`)
+    + stat('Award wins', wins)
+    + stat('Nominations', noms)
+    + stat('Oscar wins', leg.oscarWins)
+    + stat('Credits', S.filmography.length)
+    + stat('Career prestige', Math.round(S.careerPrestige || 0))
+    + stat('Final net worth', money(S.money));
+  v.appendChild(grid);
+
+  // Hall of Fame ladder
+  v.appendChild(el('p', 'muted small', `Hall of Fame rank: ${leg.rank.icon} ${leg.rank.label}`));
+
   const btn = actionBtn('🔄 Start a new career', () => { if (window.__stardomNewGame) window.__stardomNewGame(); });
   v.appendChild(btn);
   return v;
+}
+
+// ---- Awards-night summary modal --------------------------------------------
+function renderCeremonyModal() {
+  const existing = document.querySelector('#modal');
+  if (existing) existing.remove();
+  const night = S.ceremonyNight;
+  if (!night || S.gameOver) return;
+
+  const overlay = el('div', 'modal-overlay');
+  overlay.id = 'modal';
+  const card = el('div', 'modal-card');
+  const won = night.wins > 0;
+  card.appendChild(el('div', 'modal-ic', night.icon));
+  card.appendChild(el('h2', null, `${night.name}`));
+  card.appendChild(el('p', 'muted', `Awards Night · Year ${night.year}`));
+
+  const ul = el('ul', 'list modal-list');
+  for (const r of night.results) {
+    ul.appendChild(el('li', r.won ? 'award-win' : '',
+      `${r.won ? '🥇 WON' : '🎗️ Nominated'} — <b>${r.category}</b> <span class="muted">(${r.project})</span>`));
+  }
+  card.appendChild(ul);
+  card.appendChild(el('p', won ? 'modal-headline good' : 'modal-headline',
+    won ? `🎉 ${night.wins} win${night.wins === 1 ? '' : 's'} tonight!` : 'A nomination is its own honor.'));
+
+  const btn = actionBtn('Continue', () => {
+    S.ceremonyNight = null;
+    if (onMutate) onMutate(S);
+    overlay.remove();
+    render();
+  });
+  btn.classList.add('primary');
+  card.appendChild(btn);
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
 }
 
 // ---- Log -------------------------------------------------------------------
@@ -511,4 +588,5 @@ export function render() {
   const adv = $('#advance');
   adv.disabled = S.gameOver;
   adv.onclick = () => { advanceWeek(S); act({ ok: true }); };
+  renderCeremonyModal();
 }

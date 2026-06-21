@@ -245,7 +245,43 @@ footer {
 .toast.good { border-color: var(--good); }
 .toast.bad { border-color: var(--bad); }
 
-.gameover { text-align: center; padding: 40px 0; }
+.gameover { text-align: center; padding: 30px 0; }
+.hof-rank { font-size: 64px; line-height: 1; margin-bottom: 4px; }
+.lifetime {
+  background: #221c10; border: 1px solid var(--gold); border-radius: 10px;
+  padding: 10px 16px; margin: 12px auto; max-width: 460px; color: var(--gold2);
+}
+.hof-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+  max-width: 620px; margin: 18px auto;
+}
+@media (max-width: 560px) { .hof-grid { grid-template-columns: repeat(2, 1fr); } }
+.hof-stat {
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  padding: 12px 8px; display: flex; flex-direction: column; gap: 2px;
+}
+.hof-val { font-size: 20px; font-weight: 800; color: var(--gold2); }
+.hof-lab { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+
+.retire-block { margin-top: 22px; border-style: dashed; }
+
+/* Awards-night modal */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, .72);
+  display: grid; place-items: center; z-index: 50; padding: 20px;
+  animation: fade .2s ease;
+}
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+.modal-card {
+  background: var(--bg2); border: 1px solid var(--gold); border-radius: 16px;
+  padding: 28px; max-width: 460px; width: 100%; text-align: center;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .6);
+}
+.modal-ic { font-size: 48px; }
+.modal-card h2 { margin: 6px 0 2px; }
+.modal-list { text-align: left; margin: 16px 0; }
+.modal-headline { font-weight: 700; font-size: 17px; margin: 8px 0 16px; }
+.modal-headline.good { color: var(--gold2); }
 
 .muted { color: var(--muted); }
 .small { font-size: 12px; }

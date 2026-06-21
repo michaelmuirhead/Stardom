@@ -2,6 +2,7 @@
 import {
   WEEKS_PER_YEAR, AGENT_CUT, CLASSES, EVENTS,
   DIFFICULTIES, GENRES, GENRE_KEYS, CEREMONIES, creditMedium,
+  HALL_OF_FAME, LIFETIME_ACHIEVEMENT_MIN,
   projectTitle, makeRole, makeCostar,
 } from './data.js';
 import { pushLog, refreshOffers } from './state.js';
@@ -198,7 +199,7 @@ export function quitSeries(s) {
   addCredit(s, {
     title: `${sh.title} (${sh.season} season${sh.season > 1 ? 's' : ''})`,
     category: 'TV Series', role: sh.part, genre: sh.genreName,
-    lead: /lead/i.test(sh.part), quality: Math.round(sh.ratings || 50),
+    acted: true, lead: /lead/i.test(sh.part), quality: Math.round(sh.ratings || 50),
   });
   pushLog(s, `🚪 You left "${sh.title}" after ${sh.season} season(s) to pursue other work.`);
   s.activeSeries = null;
@@ -242,7 +243,7 @@ function endSeason(s) {
     addCredit(s, {
       title: `${sh.title} (${sh.season} season${sh.season > 1 ? 's' : ''})`,
       category: 'TV Series', role: sh.part, genre: sh.genreName,
-      lead: /lead/i.test(sh.part), quality: sh.ratings,
+      acted: true, lead: /lead/i.test(sh.part), quality: sh.ratings,
     });
     pushLog(s, `📉 "${sh.title}" was CANCELLED after ${sh.season} season(s) (${sh.ratings} rating). A ${sh.season >= 3 ? 'beloved' : 'brief'} run wraps. +${fg} fame.`);
     s.activeSeries = null;
@@ -411,7 +412,14 @@ export function sellScript(s, scriptId) {
   s.money += price;
   s.reputation = clamp(s.reputation + sc.quality / 30, 0, 100);
   s.scripts.splice(idx, 1);
-  pushLog(s, `💰 Sold "${sc.title}" to a studio for $${price}.`);
+  // The studio makes the film — you keep an (Oscar-eligible) writing credit.
+  // Tracked separately so it doesn't inflate your on-screen filmography.
+  if (!s.writingCredits) s.writingCredits = [];
+  s.writingCredits.push({
+    title: sc.title, role: 'Writer', genre: sc.genreName, year: s.year, wk: absWeek(s),
+    medium: 'film', written: true, writeQuality: sc.quality, quality: sc.quality,
+  });
+  pushLog(s, `💰 Sold "${sc.title}" to a studio for $${price}. You keep the writing credit.`);
   return { ok: true, msg: `Sold for $${price}.` };
 }
 
@@ -474,6 +482,7 @@ export function startProduction(s, { budgetKey, scriptId, direct }) {
     cost: tier.cost,
     scale: tier.scale,
     scriptQuality: script ? script.quality : 35,
+    written: !!script,                 // produced from your own screenplay
     genre,
     genreName: GENRES[genre].name,
     genreIcon: GENRES[genre].icon,
@@ -506,8 +515,9 @@ function wrapProduction(s, prod) {
 
   addCredit(s, {
     title: prod.title, category: 'Produced', genre: prod.genreName,
-    role: prod.directed ? 'Producer / Director' : 'Producer',
-    produced: true, directed: prod.directed, quality: Math.round(q),
+    role: [prod.directed ? 'Director' : null, 'Producer', prod.written ? 'Writer' : null].filter(Boolean).join(' / '),
+    produced: true, directed: prod.directed, written: !!prod.written,
+    writeQuality: prod.scriptQuality, quality: Math.round(q),
   });
 
   const verdict = profit > 0
@@ -547,9 +557,11 @@ function addCredit(s, c) {
     year: s.year,
     wk: absWeek(s),
     medium: creditMedium(c.category),
+    acted: !!c.acted,        // a performance (eligible for acting awards)
     lead: !!c.lead,
     produced: !!c.produced,
     directed: !!c.directed,
+    written: !!c.written,    // you wrote it (eligible for screenplay)
     ...c,
   });
 }
@@ -558,11 +570,12 @@ function addCredit(s, c) {
 // Is a credit eligible for a given category?
 function eligibleFor(c, cat) {
   if (cat.kind === 'acting') {
-    if (c.produced) return false;                 // performances only
+    if (!c.acted) return false;                    // performances only
     if (c.medium !== cat.medium) return false;
     if (cat.lead != null && !!c.lead !== cat.lead) return false;
     return true;
   }
+  if (cat.kind === 'writing') return !!c.written && c.medium === 'film';
   if (cat.kind === 'directing') return !!c.directed && c.medium === 'film';
   if (cat.kind === 'producing') return !!c.produced && c.medium === 'film';
   return false;
@@ -574,10 +587,13 @@ function eligibleFor(c, cat) {
 // roughly a 1-in-5 draw, tilted only modestly by how exceptional the work is.
 function judgeCategory(s, credit, cat, cer) {
   const craft = cat.kind === 'directing' ? s.directing
-    : cat.kind === 'producing' ? s.producing : s.acting;
+    : cat.kind === 'producing' ? s.producing
+      : cat.kind === 'writing' ? s.writing : s.acting;
+  // Writing is judged on the screenplay's quality, not the finished film's.
+  const workQuality = cat.kind === 'writing' ? (credit.writeQuality ?? credit.quality ?? 40) : (credit.quality ?? 40);
   // Campaign strength ~0..100: work quality dominates, with craft, reputation
   // (industry respect/campaigning) and fame contributing.
-  const strength = (credit.quality ?? 40) * 0.55 + craft * 0.25 + s.reputation * 0.12 + s.fame * 0.08;
+  const strength = workQuality * 0.55 + craft * 0.25 + s.reputation * 0.12 + s.fame * 0.08;
 
   // Nomination bar climbs with the ceremony's prestige (Oscars hardest).
   const bar = 60 + cer.prestige * 11;
@@ -592,7 +608,10 @@ function judgeCategory(s, credit, cat, cer) {
 
 function runCeremony(s, cer) {
   const now = absWeek(s);
-  const eligible = s.filmography.filter((c) => c.wk != null && c.wk > now - WEEKS_PER_YEAR && c.wk <= now);
+  // Both on-screen credits and sold screenplays can be in contention.
+  const all = [...s.filmography, ...(s.writingCredits || [])];
+  const eligible = all.filter((c) => c.wk != null && c.wk > now - WEEKS_PER_YEAR && c.wk <= now);
+  const results = [];
   for (const cat of cer.categories) {
     const pool = eligible.filter((c) => eligibleFor(c, cat));
     if (!pool.length) continue;
@@ -605,6 +624,7 @@ function runCeremony(s, cer) {
       ceremony: cer.name, ceremonyKey: cer.key, icon: cer.icon,
       category: cat.name, project: mine.title, year: s.year, won: res.won,
     });
+    results.push({ category: cat.name, project: mine.title, won: res.won });
     if (res.won) {
       s.stats.wins = (s.stats.wins || 0) + 1;
       gainFame(s, 4 * cer.prestige);
@@ -617,6 +637,47 @@ function runCeremony(s, cer) {
       pushLog(s, `🎗️ Nominated for ${cat.name} at the ${cer.name} ("${mine.title}").`);
     }
   }
+  // Surface an awards-night summary to the UI when you were in the running.
+  if (results.length) {
+    s.ceremonyNight = {
+      name: cer.name, icon: cer.icon, year: s.year,
+      wins: results.filter((r) => r.won).length, results,
+    };
+  }
+}
+
+// ---- Legacy / retirement ---------------------------------------------------
+// Pure: a career's legacy score and Hall of Fame rank.
+export function careerLegacy(s) {
+  const wins = s.stats.wins || 0;
+  const noms = s.stats.noms || 0;
+  const oscarWins = s.awards.filter((a) => a.ceremonyKey === 'oscars' && a.won).length;
+  const score = Math.round(
+    s.fame * 1.2
+    + wins * 9 + oscarWins * 12 + noms * 2.5
+    + (s.careerPrestige || 0) * 1.2
+    + s.filmography.length * 0.6
+    + s.reputation * 0.4,
+  );
+  let rank = HALL_OF_FAME[0];
+  for (const t of HALL_OF_FAME) if (score >= t.min) rank = t;
+  return { score, rank, lifetimeAchievement: score >= LIFETIME_ACHIEVEMENT_MIN, wins, noms, oscarWins };
+}
+
+export function retire(s) {
+  if (s.gameOver) return { ok: false, msg: 'The game is already over.' };
+  const legacy = careerLegacy(s);
+  if (legacy.lifetimeAchievement) {
+    s.awards.push({
+      ceremony: 'Lifetime Achievement', ceremonyKey: 'lifetime', icon: '🎖️',
+      category: 'Lifetime Achievement Award', project: 'a storied career', year: s.year, won: true,
+    });
+  }
+  s.legacy = legacy;
+  s.gameOver = true;
+  s.gameOverReason = 'retired';
+  pushLog(s, `🎬 After ${s.year} year(s) in the business, ${s.name} retires as a ${legacy.rank.icon} ${legacy.rank.label}.`);
+  return { ok: true, msg: 'You retired. Take a bow.' };
 }
 
 // ---- Advance one week ------------------------------------------------------
@@ -648,7 +709,7 @@ export function advanceWeek(s) {
       addCredit(s, {
         title: a.role.title, category: a.role.catName,
         role: a.role.part, genre: a.role.genreName,
-        lead: /lead/i.test(a.role.part),
+        acted: true, lead: /lead/i.test(a.role.part),
         quality: Math.round(50 + a.role.prestige * 10),
       });
       const rubMsg = rubOff > 0 ? ` (+${rubOff} from famous co-stars)` : '';
@@ -704,6 +765,7 @@ export function advanceWeek(s) {
   if (s.money < D.debtFloor) {
     s.gameOver = true;
     s.gameOverReason = 'bankrupt';
+    s.legacy = careerLegacy(s);
     pushLog(s, '💀 Bankrupt. You leave town, dreams unfulfilled. Game over.');
   }
 }

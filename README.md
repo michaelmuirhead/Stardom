@@ -96,7 +96,7 @@ judging your eligible credits from the trailing year:
 |----------|------|--------|
 | 🌐 Golden Globe Awards | early | Best Actor — Film & TV |
 | 🎟️ SAG Awards | late winter | Outstanding Performance — Film & TV |
-| 🏆 Academy Awards | spring | Best Actor, Supporting, Director, Picture |
+| 🏆 Academy Awards | spring | Best Actor, Supporting, Original Screenplay, Director, Picture |
 | 📺 Emmy Awards | fall | Outstanding Lead & Supporting Actor (TV) |
 
 Only prestigious work qualifies — strong films, acclaimed TV, and projects you
@@ -106,7 +106,24 @@ ceremonies), and even when nominated you're one of five — **winning is roughly
 1-in-5 draw**, tilted only modestly by how exceptional the work is. Expect a
 handful of wins across a great career, and an Academy Award to mean something.
 Wins and nominations both boost fame and reputation and are recorded on your
-**Career** page, grouped by ceremony.
+**Career** page, grouped by ceremony. When you're in the running, an **awards-night
+summary** pops up with that ceremony's results. **Best Original Screenplay** is
+open to films you write — both screenplays you sell to studios and your own
+self-produced projects.
+
+## Retirement & the Hall of Fame
+
+Careers don't run forever. From the **Career** tab you can **retire** at any time
+to cement your legacy and end the game on your own terms (you can also flame out
+via bankruptcy). Retiring computes a **legacy score** from your fame, award wins
+and nominations (Oscars count extra), career prestige, body of work, and
+reputation, then ranks you in the **Hall of Fame**:
+
+🎭 Forgotten Extra → 🎬 Working Actor → ⭐ Notable Talent → 🌟 Bona Fide Star →
+🏆 Hollywood Legend → 👑 Immortal Icon
+
+A sufficiently storied career is honored with a **🎖️ Lifetime Achievement Award**.
+The ending screen shows a full legacy scorecard.
 
 **Watch the money.** Weekly living costs never stop. Go broke and your career
 ends — work side jobs to stay afloat between gigs.
