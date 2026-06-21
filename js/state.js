@@ -28,7 +28,8 @@ export function newGame(playerName, difficultyKey) {
     partner: null,       // current romantic partner (contact id)
 
     careerPrestige: 0,   // cumulative prestige across your whole career
-    stats: { auditions: 0, landed: 0, classes: 0, seasons: 0, wins: 0, noms: 0 },
+    milestonesDone: {},  // milestone key -> year completed
+    stats: { auditions: 0, landed: 0, classes: 0, seasons: 0, wins: 0, noms: 0, written: 0, extra: 0 },
     gameOver: false,
     log: [],
   };

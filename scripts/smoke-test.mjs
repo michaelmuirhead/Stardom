@@ -127,7 +127,10 @@ function exerciseAwards(years) {
     }
     advanceWeek(s);
   }
-  return { wins: s.stats.wins || 0, noms: s.stats.noms || 0, years, fame: s.fame };
+  return {
+    wins: s.stats.wins || 0, noms: s.stats.noms || 0, years, fame: s.fame,
+    milestones: Object.keys(s.milestonesDone || {}).length,
+  };
 }
 
 console.log('Stardom engine smoke test\n');
@@ -173,9 +176,10 @@ assert(early.preAgentBoardOk, 'pre-agent board only shows open-call roles');
 // 5) Awards season fires and produces realistic (non-runaway) outcomes
 const YEARS = 15;
 const aw = exerciseAwards(YEARS);
-console.log(`  awards (${YEARS}yr legend): ${aw.wins} wins, ${aw.noms} nominations`);
+console.log(`  awards (${YEARS}yr legend): ${aw.wins} wins, ${aw.noms} nominations, ${aw.milestones} milestones`);
 assert(aw.wins + aw.noms > 0, 'awards season produced nominations/wins over a long career');
 assert(aw.wins < YEARS, `award wins are realistic, not runaway (${aw.wins} over ${YEARS}yr)`);
+assert(aw.milestones >= 6, `career milestones are completed over a long career (${aw.milestones})`);
 
 console.log('');
 if (failures) {

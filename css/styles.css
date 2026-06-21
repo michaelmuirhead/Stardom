@@ -153,6 +153,10 @@ main {
 
 .quick { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
 
+/* Goals / milestones */
+.card.goal-done { opacity: .72; border-color: var(--good); }
+.card.goal-done .card-title { text-decoration: none; color: var(--good); }
+
 .agent-goal {
   background: #221c10; border: 1px solid var(--gold);
   border-radius: 10px; padding: 10px 14px; margin-bottom: 16px; font-size: 14px;

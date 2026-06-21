@@ -1,10 +1,10 @@
 // ui.js — rendering & event wiring
-import { CLASSES, GENRES, GENRE_KEYS, CEREMONIES, fameTier } from './data.js';
+import { CLASSES, GENRES, GENRE_KEYS, CEREMONIES, MILESTONES, fameTier } from './data.js';
 import {
   audition, auditionChance, takeClass, network, rest, sideJob, extraWork, toggleAgent,
   writeScript, sellScript, startProduction, estimateProduction, advanceWeek, isBusy, BUDGET_TIERS,
   catchUp, quitSeries, specialty, diffOf, agentReady, AGENT_FAME_REQ, AGENT_CREDITS_REQ,
-  retire, careerLegacy,
+  retire, careerLegacy, checkMilestones, typecastInfo,
 } from './engine.js';
 
 let S = null;        // current game state
@@ -29,6 +29,9 @@ export function bindUI(state, mutateCb) {
 
 function act(result) {
   if (result && result.msg) toast(result.msg, result.ok === false ? 'bad' : 'good');
+  // Surface any milestones completed by this action.
+  const done = checkMilestones(S);
+  if (done.length) toast(`🎯 ${done[0].icon} ${done[0].name}!`, 'good');
   if (onMutate) onMutate(S);
   render();
 }
@@ -106,6 +109,7 @@ function progressCard(label, done, total, right, sub) {
 // ---- Tabs ------------------------------------------------------------------
 const TABS = [
   ['auditions', '🎟️ Auditions'],
+  ['goals', '🎯 Goals'],
   ['train', '📚 Train'],
   ['create', '🎬 Create'],
   ['people', '👥 People'],
@@ -127,6 +131,7 @@ function renderPanel() {
   p.innerHTML = '';
   if (S.gameOver) { p.appendChild(gameOverView()); return; }
   if (activeTab === 'auditions') p.appendChild(auditionsView());
+  else if (activeTab === 'goals') p.appendChild(goalsView());
   else if (activeTab === 'train') p.appendChild(trainView());
   else if (activeTab === 'create') p.appendChild(createView());
   else if (activeTab === 'people') p.appendChild(peopleView());
@@ -195,11 +200,19 @@ function roleCard(r) {
       <span>Needs acting ${r.skillReq}</span>
       <span>Needs fame ${r.fameReq}</span>
     </div>
-    <div class="chance ${chCls}">Audition odds: ${chance}%</div>`;
+    <div class="chance ${chCls}">Audition odds: ${chance}%</div>
+    ${offTypeNote(r)}`;
   const btn = actionBtn(r.callback ? '🎟️ Callback audition (18⚡)' : '🎟️ Audition (18⚡)',
     () => act(audition(S, r.id)), S.energy < 18);
   c.appendChild(btn);
   return c;
+}
+
+function offTypeNote(r) {
+  const tc = typecastInfo(S);
+  if (!tc.genre || tc.degree <= 0) return '';
+  if (r.genre === tc.genre) return `<div class="muted small">🎯 On-brand for your ${GENRES[tc.genre].name} image.</div>`;
+  return `<div class="bad small">⚠️ Against type — you're known for ${GENRES[tc.genre].name} (−${Math.round(tc.degree * 15)}% odds).</div>`;
 }
 
 // ---- Train view ------------------------------------------------------------
@@ -338,6 +351,40 @@ function labeled(label, node) {
   return w;
 }
 
+// ---- Goals view (milestones) -----------------------------------------------
+function goalsView() {
+  const wrap = el('div', 'view');
+  const done = MILESTONES.filter((m) => S.milestonesDone[m.key]);
+  const pending = MILESTONES.filter((m) => !S.milestonesDone[m.key]);
+  wrap.appendChild(el('h2', null, `🎯 Career Goals — ${done.length}/${MILESTONES.length}`));
+  wrap.appendChild(el('p', 'muted small', 'Milestones chart your rise from unknown to icon. Each grants a small reward when reached.'));
+
+  if (pending.length) {
+    wrap.appendChild(el('h3', null, 'Up Next'));
+    const grid = el('div', 'grid');
+    for (const m of pending) grid.appendChild(goalCard(m, false));
+    wrap.appendChild(grid);
+  }
+  if (done.length) {
+    wrap.appendChild(el('h3', null, '✅ Achieved'));
+    const grid = el('div', 'grid');
+    for (const m of done) grid.appendChild(goalCard(m, true));
+    wrap.appendChild(grid);
+  }
+  return wrap;
+}
+
+function goalCard(m, complete) {
+  const r = m.reward || {};
+  const reward = [r.money ? `+$${r.money}` : null, r.rep ? `+${r.rep} rep` : null, r.fame ? `+${r.fame} fame` : null].filter(Boolean).join(' · ');
+  const card = el('div', 'card goal' + (complete ? ' goal-done' : ''));
+  card.innerHTML = `<div class="card-head"><span class="card-ic">${complete ? '✅' : m.icon}</span>
+    <div><div class="card-title">${m.name}</div>
+    <div class="muted small">${m.desc}</div></div></div>
+    ${reward ? `<div class="muted small">Reward: ${reward}${complete && S.milestonesDone[m.key] ? ` · <span class="good">done Yr ${S.milestonesDone[m.key]}</span>` : ''}</div>` : ''}`;
+  return card;
+}
+
 // ---- People view (co-stars & relationships) --------------------------------
 function peopleView() {
   const wrap = el('div', 'view');
@@ -404,7 +451,15 @@ function careerView() {
     gskills.appendChild(row);
   }
   wrap.appendChild(gskills);
-  wrap.appendChild(el('p', 'muted small', 'More experience in a genre raises your audition odds for similar roles — and defines your public brand.'));
+  const tc = typecastInfo(S);
+  if (tc.genre && tc.degree > 0) {
+    const sev = tc.degree > 0.6 ? 'bad' : 'mid';
+    wrap.appendChild(el('p', `small ${sev === 'bad' ? 'chance bad' : ''}`,
+      `🎭 <b>Typecast</b> as a ${GENRES[tc.genre].icon} ${GENRES[tc.genre].name} actor (${Math.round(tc.share * 100)}% of your work). ` +
+      `Casting against type is ${Math.round(tc.degree * 15)}% harder. Work other genres to broaden your range.`));
+  } else {
+    wrap.appendChild(el('p', 'muted small', 'More experience in a genre raises your audition odds for similar roles — and defines your public brand. Spread too thin in one and you risk being typecast.'));
+  }
 
   const meta = el('div', 'meta-row');
   meta.innerHTML = `<span>Agent: ${S.hasAgent ? '✅ Signed' : '— None'}</span>
@@ -542,8 +597,11 @@ function renderCeremonyModal() {
 
   const ul = el('ul', 'list modal-list');
   for (const r of night.results) {
+    const react = (r.reactions && r.reactions.length)
+      ? `<div class="muted small">${r.won ? '🤝 Celebrating with' : '👏 Supported by'} ${r.reactions.slice(0, 3).join(', ')}</div>`
+      : '';
     ul.appendChild(el('li', r.won ? 'award-win' : '',
-      `${r.won ? '🥇 WON' : '🎗️ Nominated'} — <b>${r.category}</b> <span class="muted">(${r.project})</span>`));
+      `${r.won ? '🥇 WON' : '🎗️ Nominated'} — <b>${r.category}</b> <span class="muted">(${r.project})</span>${react}`));
   }
   card.appendChild(ul);
   card.appendChild(el('p', won ? 'modal-headline good' : 'modal-headline',

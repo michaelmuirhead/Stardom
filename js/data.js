@@ -285,3 +285,24 @@ export const HALL_OF_FAME = [
 
 // Legacy score at/above this earns an honorary Lifetime Achievement Award.
 export const LIFETIME_ACHIEVEMENT_MIN = 480;
+
+// ---- Milestones / onboarding ----------------------------------------------
+// Career goals that guide the player and grant small rewards on completion.
+// `check(s)` is evaluated against game state; `reward` is applied once.
+export const MILESTONES = [
+  { key: 'first_job', icon: '🎬', name: 'First Day on Set', desc: 'Book any paying gig — even as an extra.', reward: { money: 150 }, check: (s) => (s.stats.extra || 0) > 0 || s.stats.landed > 0 },
+  { key: 'first_class', icon: '📚', name: 'Trained Up', desc: 'Take your first class.', reward: { rep: 2 }, check: (s) => s.stats.classes > 0 },
+  { key: 'first_credit', icon: '🎞️', name: 'In the Credits', desc: 'Earn your first on-screen credit.', reward: { money: 300 }, check: (s) => s.filmography.length > 0 },
+  { key: 'agent', icon: '🕴️', name: 'Represented', desc: 'Sign with a talent agent.', reward: { rep: 4 }, check: (s) => s.hasAgent },
+  { key: 'fame25', icon: '⭐', name: 'Recognizable', desc: 'Reach 25 fame.', reward: { money: 1000 }, check: (s) => s.fame >= 25 },
+  { key: 'studio_film', icon: '🎥', name: 'Studio Player', desc: 'Appear in a studio film.', reward: { rep: 5 }, check: (s) => s.filmography.some((f) => f.category === 'Studio Film' && f.acted) },
+  { key: 'tv_regular', icon: '📡', name: 'Series Regular', desc: 'Star in a season of TV.', reward: { rep: 4 }, check: (s) => (s.stats.seasons || 0) > 0 },
+  { key: 'first_script', icon: '✍️', name: 'Screenwriter', desc: 'Write your first script.', reward: { rep: 3 }, check: (s) => (s.stats.written || 0) > 0 },
+  { key: 'produce', icon: '💼', name: 'Mogul in the Making', desc: 'Produce a film.', reward: { rep: 5 }, check: (s) => s.filmography.some((f) => f.produced) },
+  { key: 'direct', icon: '🎬', name: 'Auteur', desc: 'Direct a film.', reward: { rep: 5 }, check: (s) => s.filmography.some((f) => f.directed) },
+  { key: 'first_nom', icon: '🎗️', name: 'Nominated', desc: 'Earn an awards nomination.', reward: { fame: 2 }, check: (s) => (s.stats.noms || 0) + (s.stats.wins || 0) > 0 },
+  { key: 'first_win', icon: '🥇', name: 'Award Winner', desc: 'Win an award.', reward: { fame: 4, rep: 6 }, check: (s) => (s.stats.wins || 0) > 0 },
+  { key: 'oscar', icon: '🏆', name: 'Academy Award', desc: 'Win an Academy Award.', reward: { fame: 6, rep: 8 }, check: (s) => s.awards.some((a) => a.ceremonyKey === 'oscars' && a.won) },
+  { key: 'alist', icon: '🌟', name: 'A-List', desc: 'Reach 85 fame.', reward: { rep: 5 }, check: (s) => s.fame >= 85 },
+  { key: 'millionaire', icon: '💰', name: 'Millionaire', desc: 'Bank $1,000,000.', reward: { rep: 3 }, check: (s) => s.money >= 1000000 },
+];

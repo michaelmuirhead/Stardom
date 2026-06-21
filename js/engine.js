@@ -2,7 +2,7 @@
 import {
   WEEKS_PER_YEAR, AGENT_CUT, CLASSES, EVENTS,
   DIFFICULTIES, GENRES, GENRE_KEYS, CEREMONIES, creditMedium,
-  HALL_OF_FAME, LIFETIME_ACHIEVEMENT_MIN,
+  HALL_OF_FAME, LIFETIME_ACHIEVEMENT_MIN, MILESTONES,
   projectTitle, makeRole, makeCostar,
 } from './data.js';
 import { pushLog, refreshOffers } from './state.js';
@@ -25,6 +25,24 @@ export function diffOf(s) { return DIFFICULTIES[s.difficulty] || DIFFICULTIES.no
 
 export function genreAffinity(s, genre) {
   return (s.genres && s.genres[genre]) || 0;
+}
+
+// Typecasting: once a real body of work is concentrated in one genre, casting
+// directors pigeonhole you — boosting your in-brand odds but hurting your
+// chances of being cast against type. Returns the dominant genre and a 0..1
+// degree (0 until your top genre exceeds ~45% of your experience).
+export function typecastInfo(s) {
+  if (!s.genres) return { genre: null, degree: 0, share: 0 };
+  let total = 0, top = null, topV = 0;
+  for (const k of GENRE_KEYS) {
+    const v = s.genres[k] || 0;
+    total += v;
+    if (v > topV) { topV = v; top = k; }
+  }
+  if (total < 30 || !top) return { genre: null, degree: 0, share: 0 };
+  const share = topV / total;
+  const degree = clamp((share - 0.45) / 0.4, 0, 1);
+  return { genre: top, degree, share };
 }
 
 // The genre you've worked in most — your public "specialty".
@@ -68,6 +86,9 @@ export function auditionChance(s, role) {
   chance += connectionBonus(s);
   // Specialization: experience in this genre makes you a natural fit.
   chance += clamp(genreAffinity(s, role.genre) / 250, 0, 0.2);
+  // Typecasting: hard to get cast against your established brand.
+  const tc = typecastInfo(s);
+  if (tc.genre && role.genre !== tc.genre) chance -= tc.degree * 0.15;
   // A callback means they already liked you — better shot the second time.
   if (role.callback) chance += 0.18;
   return clamp(chance, 0.03, 0.97);
@@ -199,7 +220,8 @@ export function quitSeries(s) {
   addCredit(s, {
     title: `${sh.title} (${sh.season} season${sh.season > 1 ? 's' : ''})`,
     category: 'TV Series', role: sh.part, genre: sh.genreName,
-    acted: true, lead: /lead/i.test(sh.part), quality: Math.round(sh.ratings || 50),
+    acted: true, lead: /lead/i.test(sh.part), costars: (sh.costars || []).map((c) => c.id),
+    quality: Math.round(sh.ratings || 50),
   });
   pushLog(s, `🚪 You left "${sh.title}" after ${sh.season} season(s) to pursue other work.`);
   s.activeSeries = null;
@@ -243,7 +265,8 @@ function endSeason(s) {
     addCredit(s, {
       title: `${sh.title} (${sh.season} season${sh.season > 1 ? 's' : ''})`,
       category: 'TV Series', role: sh.part, genre: sh.genreName,
-      acted: true, lead: /lead/i.test(sh.part), quality: sh.ratings,
+      acted: true, lead: /lead/i.test(sh.part), costars: (sh.costars || []).map((c) => c.id),
+      quality: sh.ratings,
     });
     pushLog(s, `📉 "${sh.title}" was CANCELLED after ${sh.season} season(s) (${sh.ratings} rating). A ${sh.season >= 3 ? 'beloved' : 'brief'} run wraps. +${fg} fame.`);
     s.activeSeries = null;
@@ -400,6 +423,7 @@ export function writeScript(s) {
   // Learn by doing: every script sharpens your writing.
   const skillGain = +rf(0.3, 0.8).toFixed(2);
   s.writing = clamp(+(s.writing + skillGain).toFixed(1), 0, 100);
+  s.stats.written = (s.stats.written || 0) + 1;
   pushLog(s, `✍️ You finished a ${script.genreName} script: "${script.title}" (quality ${quality}). +${skillGain} writing.`);
   return { ok: true, msg: `Wrote "${script.title}".` };
 }
@@ -581,6 +605,28 @@ function eligibleFor(c, cat) {
   return false;
 }
 
+// Co-stars from the honored project share the moment: relationships warm
+// (more for a win), and your partner is especially thrilled. Returns names for
+// the awards-night summary.
+function costarReactions(s, credit, won) {
+  const names = [];
+  const ids = credit.costars || [];
+  for (const id of ids) {
+    const c = s.contacts.find((x) => x.id === id);
+    if (!c) continue;
+    c.rel = clamp(c.rel + (won ? rf(4, 9) : rf(1, 4)), 0, 100);
+    names.push(c.name);
+  }
+  if (s.partner) {
+    const p = s.contacts.find((x) => x.id === s.partner);
+    if (p) {
+      p.rel = clamp(p.rel + (won ? rf(3, 6) : rf(1, 3)), 0, 100);
+      if (!names.includes(p.name)) names.push(p.name);
+    }
+  }
+  return names;
+}
+
 // Judge one category. Realism over a whole career: a nomination is a selective
 // honor (your work must clear an absolute industry bar, higher at more
 // prestigious ceremonies), and even when nominated you're one of ~5 — winning is
@@ -624,7 +670,8 @@ function runCeremony(s, cer) {
       ceremony: cer.name, ceremonyKey: cer.key, icon: cer.icon,
       category: cat.name, project: mine.title, year: s.year, won: res.won,
     });
-    results.push({ category: cat.name, project: mine.title, won: res.won });
+    const reactions = costarReactions(s, mine, res.won);
+    results.push({ category: cat.name, project: mine.title, won: res.won, reactions });
     if (res.won) {
       s.stats.wins = (s.stats.wins || 0) + 1;
       gainFame(s, 4 * cer.prestige);
@@ -644,6 +691,26 @@ function runCeremony(s, cer) {
       wins: results.filter((r) => r.won).length, results,
     };
   }
+}
+
+// ---- Milestones ------------------------------------------------------------
+// Fire any newly-completed milestones, applying rewards. Idempotent.
+export function checkMilestones(s) {
+  if (!s.milestonesDone) s.milestonesDone = {};
+  const newly = [];
+  for (const m of MILESTONES) {
+    if (s.milestonesDone[m.key]) continue;
+    if (!m.check(s)) continue;
+    s.milestonesDone[m.key] = s.year;
+    const r = m.reward || {};
+    if (r.money) s.money += r.money;
+    if (r.rep) s.reputation = clamp(s.reputation + r.rep, 0, 100);
+    if (r.fame) gainFame(s, r.fame);
+    const bits = [r.money ? `+$${r.money}` : null, r.rep ? `+${r.rep} rep` : null, r.fame ? `+${r.fame} fame` : null].filter(Boolean);
+    pushLog(s, `🎯 Milestone reached: ${m.icon} ${m.name}!${bits.length ? ' ' + bits.join(', ') : ''}`);
+    newly.push(m);
+  }
+  return newly;
 }
 
 // ---- Legacy / retirement ---------------------------------------------------
@@ -710,6 +777,7 @@ export function advanceWeek(s) {
         title: a.role.title, category: a.role.catName,
         role: a.role.part, genre: a.role.genreName,
         acted: true, lead: /lead/i.test(a.role.part),
+        costars: (a.costars || []).map((c) => c.id),
         quality: Math.round(50 + a.role.prestige * 10),
       });
       const rubMsg = rubOff > 0 ? ` (+${rubOff} from famous co-stars)` : '';
@@ -760,6 +828,9 @@ export function advanceWeek(s) {
   for (const cer of CEREMONIES) {
     if (s.week === cer.week) runCeremony(s, cer);
   }
+
+  // Career milestones (passive completions: fame/money thresholds, awards, etc.)
+  checkMilestones(s);
 
   // Lose condition: deep, sustained debt
   if (s.money < D.debtFloor) {

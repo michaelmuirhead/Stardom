@@ -62,10 +62,17 @@ series-regular TV roles that open calls never offer (the agent takes a 12% cut i
 return). Reaching it is a genuine climb of roughly a year of scraping by; fame
 comes slowly while you're an unknown and compounds once you're recognized.
 
-**Genre specialization.** Every role has a genre (🎭 Drama, 😂 Comedy, 💥 Action,
-👻 Horror, 🚀 Sci-Fi, 💖 Romance). The more you work in a genre, the better your
-audition odds for similar roles — and the more your top genre becomes your public
-brand (e.g. *Action Star*, *Scream Queen*), shown on your Career page.
+**Genre specialization & typecasting.** Every role has a genre (🎭 Drama, 😂 Comedy,
+💥 Action, 👻 Horror, 🚀 Sci-Fi, 💖 Romance). The more you work in a genre, the
+better your audition odds for similar roles — and the more your top genre becomes
+your public brand (e.g. *Action Star*, *Scream Queen*), shown on your Career page.
+But lean too hard into one genre and you get **typecast**: casting directors
+struggle to see you in anything else, so your odds in *other* genres drop. Working
+across genres keeps your range — a real strategic tension.
+
+**Career goals.** A **🎯 Goals** tab tracks ~15 milestones that chart your rise
+from first day on set to Academy Award winner and millionaire, each granting a
+small reward and giving you direction at every stage.
 
 **Co-stars & relationships.** Land a role and you meet co-stars, who become
 lasting contacts. A close, famous ally boosts your audition odds; a famous
@@ -107,7 +114,8 @@ ceremonies), and even when nominated you're one of five — **winning is roughly
 handful of wins across a great career, and an Academy Award to mean something.
 Wins and nominations both boost fame and reputation and are recorded on your
 **Career** page, grouped by ceremony. When you're in the running, an **awards-night
-summary** pops up with that ceremony's results. **Best Original Screenplay** is
+summary** pops up with that ceremony's results — and the **co-stars** from the
+honored project celebrate with you, deepening those relationships. **Best Original Screenplay** is
 open to films you write — both screenplays you sell to studios and your own
 self-produced projects.
 
