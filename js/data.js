@@ -15,27 +15,34 @@ export const START = {
 };
 
 export const WEEKS_PER_YEAR = 52;
-export const LIVING_COST = 220;          // weekly expenses (Normal baseline)
+export const LIVING_COST = 1500;         // weekly expenses (Normal baseline)
 export const AGENT_CUT = 0.12;           // agent takes a slice of role pay
 
-// ---- Difficulty ------------------------------------------------------------
+// ---- Difficulty (Hollywood-scale economy) ----------------------------------
 export const DIFFICULTIES = {
   easy: {
     key: 'easy', name: 'Easy', icon: '🌱',
-    startMoney: 3000, living: 160, payMult: 1.25, oddsBonus: 0.08, debtFloor: -5000,
+    startMoney: 20000, living: 1100, payMult: 1.25, oddsBonus: 0.08, debtFloor: -30000,
     blurb: 'Generous pay, forgiving auditions. Learn the ropes.',
   },
   normal: {
     key: 'normal', name: 'Normal', icon: '🎯',
-    startMoney: 1500, living: 220, payMult: 1.0, oddsBonus: 0, debtFloor: -3000,
+    startMoney: 10000, living: 1500, payMult: 1.0, oddsBonus: 0, debtFloor: -20000,
     blurb: 'The intended Hollywood grind.',
   },
   hard: {
     key: 'hard', name: 'Hard', icon: '🔥',
-    startMoney: 700, living: 300, payMult: 0.85, oddsBonus: -0.08, debtFloor: -2000,
+    startMoney: 5000, living: 2200, payMult: 0.85, oddsBonus: -0.08, debtFloor: -12000,
     blurb: 'Lean wallet, brutal odds. Only the dedicated survive.',
   },
 };
+
+// A star's "quote": pay scales steeply with fame, so an A-lister commands far
+// more than an unknown for the same role. Floors at 1x (a newcomer earns the
+// baseline) and climbs to ~10x at fame 100.
+export function fameQuote(fame) {
+  return 1 + Math.pow(clampNum(fame, 0, 100) / 100, 1.6) * 9;
+}
 
 // ---- Genres ----------------------------------------------------------------
 export const GENRES = {
@@ -53,38 +60,58 @@ export const GENRE_KEYS = Object.keys(GENRES);
 export const CATEGORIES = {
   commercial: {
     key: 'commercial', name: 'Commercial', icon: '📺',
-    payBase: 800, fameBase: 1.5, skillBase: 1, weeks: [1, 1, 2],
+    payBase: 6000, fameBase: 1.5, skillBase: 1, weeks: [1, 1, 2],
     prestige: 0.2, blurb: 'Quick paycheck, little glory.',
+  },
+  theatre: {
+    key: 'theatre', name: 'Theatre', icon: '🎭',
+    payBase: 4000, fameBase: 3, skillBase: 7, weeks: [6, 8, 12],
+    prestige: 1.3, blurb: 'Low pay, but huge for your craft & reputation.',
+  },
+  voice: {
+    key: 'voice', name: 'Voice Acting', icon: '🎙️',
+    payBase: 12000, fameBase: 1.5, skillBase: 3, weeks: [3, 4, 6],
+    prestige: 0.6, blurb: 'A steady paycheck — but you\'re unseen.',
   },
   tvmovie: {
     key: 'tvmovie', name: 'TV Movie', icon: '🎞️',
-    payBase: 4000, fameBase: 4, skillBase: 3, weeks: [3, 4, 5],
+    payBase: 35000, fameBase: 4, skillBase: 3, weeks: [3, 4, 5],
     prestige: 0.6, blurb: 'A made-for-television feature.',
-  },
-  tvshow: {
-    key: 'tvshow', name: 'TV Series', icon: '📡',
-    payBase: 7000, fameBase: 6, skillBase: 4, weeks: [5, 7, 9],
-    prestige: 0.9, blurb: 'Recurring exposure on the small screen.',
   },
   indie: {
     key: 'indie', name: 'Indie Film', icon: '🎥',
-    payBase: 3000, fameBase: 5, skillBase: 5, weeks: [4, 6, 8],
+    payBase: 22000, fameBase: 5, skillBase: 5, weeks: [4, 6, 8],
     prestige: 1.4, blurb: 'Low pay, high prestige, festival darling.',
+  },
+  documentary: {
+    key: 'documentary', name: 'Documentary', icon: '📽️',
+    payBase: 14000, fameBase: 3, skillBase: 4, weeks: [4, 6, 8],
+    prestige: 1.5, blurb: 'Little money, lots of prestige.',
+  },
+  tvshow: {
+    key: 'tvshow', name: 'TV Series', icon: '📡',
+    payBase: 55000, fameBase: 6, skillBase: 4, weeks: [5, 7, 9],
+    prestige: 0.9, blurb: 'Recurring exposure — and a salary that can explode.',
+  },
+  miniseries: {
+    key: 'miniseries', name: 'Miniseries', icon: '🎬',
+    payBase: 130000, fameBase: 7, skillBase: 5, weeks: [6, 8, 10],
+    prestige: 1.5, blurb: 'Prestige limited series. Strong pay, awards bait.',
+  },
+  streamseries: {
+    key: 'streamseries', name: 'Streaming Series', icon: '📱',
+    payBase: 120000, fameBase: 8, skillBase: 5, weeks: [6, 8, 10],
+    prestige: 1.1, blurb: 'A binge-released limited series.',
   },
   movie: {
     key: 'movie', name: 'Studio Film', icon: '🎬',
-    payBase: 15000, fameBase: 10, skillBase: 6, weeks: [6, 9, 12],
+    payBase: 400000, fameBase: 10, skillBase: 6, weeks: [6, 9, 12],
     prestige: 1.6, blurb: 'The big leagues. Big budgets, big risk.',
   },
   streamfilm: {
     key: 'streamfilm', name: 'Streaming Film', icon: '🍿',
-    payBase: 18000, fameBase: 9, skillBase: 6, weeks: [5, 7, 10],
+    payBase: 480000, fameBase: 9, skillBase: 6, weeks: [5, 7, 10],
     prestige: 1.4, blurb: 'A splashy streaming-platform original. Pays huge.',
-  },
-  streamseries: {
-    key: 'streamseries', name: 'Streaming Series', icon: '📱',
-    payBase: 13000, fameBase: 8, skillBase: 5, weeks: [6, 8, 10],
-    prestige: 1.1, blurb: 'A binge-released limited series.',
   },
 };
 
@@ -132,7 +159,7 @@ export function fullName() {
 // Generate a single audition offer scaled to player fame.
 // Roles an actor can reach without representation: smaller, lower-paid gigs.
 // Studio films and series-regular TV roles only come through an agent.
-export const OPEN_CALL_CATS = ['commercial', 'tvmovie', 'indie'];
+export const OPEN_CALL_CATS = ['commercial', 'tvmovie', 'indie', 'theatre', 'voice'];
 
 export function makeRole(playerFame, openCall = false) {
   const keys = openCall ? OPEN_CALL_CATS : Object.keys(CATEGORIES);
@@ -148,7 +175,7 @@ export function makeRole(playerFame, openCall = false) {
   const billing = rollBilling(playerFame, tier, openCall);
   const skillReq = Math.round(cat.skillBase * 4 + tier * 9 + rf(-3, 5));
   const fameReq = Math.round(cat.fameBase * 1.2 + tier * 6 + billing.fameReqAdd + rf(-2, 4));
-  const pay = Math.round(cat.payBase * mult * billing.payMult * rf(0.8, 1.3) * disc);
+  const pay = Math.round(cat.payBase * mult * billing.payMult * fameQuote(playerFame) * rf(0.8, 1.3) * disc);
   const fameGain = +(cat.fameBase * mult * billing.fameMult * rf(0.8, 1.25) * disc).toFixed(1);
   const skillGain = +(cat.skillBase * rf(0.8, 1.4) + tier * 0.6).toFixed(1);
   const weeks = cat.weeks[tier];
@@ -207,10 +234,10 @@ export function makeRival(playerFame) {
 
 // ---- Classes / training ----------------------------------------------------
 export const CLASSES = [
-  { key: 'acting', stat: 'acting', name: 'Acting Workshop', icon: '🎭', cost: 350, energy: 25, gain: [1.5, 3], cap: 100, desc: 'Sharpen your core craft.' },
-  { key: 'directing', stat: 'directing', name: 'Directing Seminar', icon: '🎬', cost: 600, energy: 30, gain: [1.2, 2.6], cap: 100, desc: 'Learn to run the set.', unlockFame: 15 },
-  { key: 'writing', stat: 'writing', name: 'Screenwriting Course', icon: '✍️', cost: 450, energy: 25, gain: [1.3, 2.8], cap: 100, desc: 'Craft compelling scripts.', unlockFame: 10 },
-  { key: 'producing', stat: 'producing', name: 'Producing Bootcamp', icon: '💼', cost: 800, energy: 30, gain: [1.1, 2.4], cap: 100, desc: 'Master budgets & deals.', unlockFame: 25 },
+  { key: 'acting', stat: 'acting', name: 'Acting Workshop', icon: '🎭', cost: 1500, energy: 25, gain: [1.5, 3], cap: 100, desc: 'Sharpen your core craft.' },
+  { key: 'directing', stat: 'directing', name: 'Directing Seminar', icon: '🎬', cost: 2600, energy: 30, gain: [1.2, 2.6], cap: 100, desc: 'Learn to run the set.', unlockFame: 15 },
+  { key: 'writing', stat: 'writing', name: 'Screenwriting Course', icon: '✍️', cost: 1900, energy: 25, gain: [1.3, 2.8], cap: 100, desc: 'Craft compelling scripts.', unlockFame: 10 },
+  { key: 'producing', stat: 'producing', name: 'Producing Bootcamp', icon: '💼', cost: 3500, energy: 30, gain: [1.1, 2.4], cap: 100, desc: 'Master budgets & deals.', unlockFame: 25 },
 ];
 
 // ---- Random weekly events --------------------------------------------------
@@ -230,7 +257,7 @@ export const EVENTS = [
   },
   {
     id: 'gift', chance: 0.04,
-    run: (s) => ({ msg: '🎁 A residual cheque arrived in the mail. +Money.', delta: { money: 300 + Math.floor(Math.random() * 700) } }),
+    run: (s) => ({ msg: '🎁 A residual cheque arrived in the mail. +Money.', delta: { money: 8000 + Math.floor(Math.random() * 25000) } }),
   },
   {
     id: 'burnout', chance: 0.05, when: (s) => s.energy < 35,
@@ -254,9 +281,9 @@ export const CHOICE_EVENTS = [
   {
     id: 'tabloid', when: (s) => s.fame > 18,
     title: '📰 A Tabloid Comes Knocking',
-    text: 'A gossip magazine offers $8,000 for a tell-all about a co-star\'s on-set behavior.',
+    text: 'A gossip magazine offers $250,000 for a tell-all about a co-star\'s on-set behavior.',
     options: [
-      { label: 'Take the money', outcome: () => ({ money: 8000, rep: -8, partnerRel: -10, msg: 'You cash in — but the industry frowns, and it stings close to home.' }) },
+      { label: 'Take the money', outcome: () => ({ money: 250000, rep: -8, partnerRel: -10, msg: 'You cash in — but the industry frowns, and it stings close to home.' }) },
       { label: 'Politely decline', outcome: () => ({ rep: 4, msg: 'You keep your mouth shut. Colleagues note your discretion.' }) },
     ],
   },
@@ -288,11 +315,11 @@ export const CHOICE_EVENTS = [
     ],
   },
   {
-    id: 'gala', when: (s) => s.money > 20000,
+    id: 'gala', when: (s) => s.money > 1000000,
     title: '🎗️ Charity Gala',
     text: 'A high-profile charity asks you to headline their fundraiser — and donate.',
     options: [
-      { label: 'Donate generously ($15k)', outcome: () => ({ money: -15000, rep: 8, fame: 2, msg: 'Your generosity earns goodwill across the industry.' }) },
+      { label: 'Donate generously ($500k)', outcome: () => ({ money: -500000, rep: 8, fame: 2, msg: 'Your generosity earns goodwill across the industry.' }) },
       { label: 'Attend, don\'t donate', outcome: () => ({ fame: 1, msg: 'You show your face. Nice photos, modest buzz.' }) },
       { label: 'Skip it', outcome: () => ({ rep: -2, msg: 'You stay home. A few eyebrows raise.' }) },
     ],
@@ -302,7 +329,7 @@ export const CHOICE_EVENTS = [
     title: '🎬 Passion vs. Paycheck',
     text: 'Two scripts land on your desk: a soulless blockbuster cameo and a tiny, brilliant indie.',
     options: [
-      { label: 'Chase the paycheck', outcome: () => ({ money: 30000, rep: -3, msg: 'Easy money. The art crowd sighs.' }) },
+      { label: 'Chase the paycheck', outcome: () => ({ money: 2000000, rep: -3, msg: 'Easy money. The art crowd sighs.' }) },
       { label: 'Follow your heart', outcome: () => ({ rep: 6, acting: rf(1, 3), msg: 'The indie pays nothing but feeds your craft and credibility.' }) },
     ],
   },
@@ -367,11 +394,11 @@ export const CHOICE_EVENTS = [
     ],
   },
   {
-    id: 'campaign', when: (s) => s.fame > 40 && s.money > 25000,
+    id: 'campaign', when: (s) => s.fame > 40 && s.money > 1500000,
     title: '📣 Awards Campaign',
     text: 'Your team pitches an expensive "For Your Consideration" campaign this season.',
     options: [
-      { label: 'Fund the campaign ($20k)', outcome: () => ({ money: -20000, rep: 3, fame: 4, msg: 'The billboards go up. Voters are paying attention.' }) },
+      { label: 'Fund the campaign ($1M)', outcome: () => ({ money: -1000000, rep: 3, fame: 4, msg: 'The billboards go up. Voters are paying attention.' }) },
       { label: 'Let the work speak', outcome: () => ({ msg: 'You trust the performance to stand on its own.' }) },
     ],
   },
@@ -435,9 +462,9 @@ export const CEREMONIES = [
 
 // Map a filmography credit's category label to an awards medium.
 export function creditMedium(category) {
-  if (['Indie Film', 'Studio Film', 'Streaming Film', 'Produced'].includes(category)) return 'film';
-  if (['TV Series', 'TV Movie', 'Streaming Series'].includes(category)) return 'tv';
-  return 'other'; // commercials etc. are not awards-eligible
+  if (['Indie Film', 'Studio Film', 'Streaming Film', 'Documentary', 'Produced'].includes(category)) return 'film';
+  if (['TV Series', 'TV Movie', 'Streaming Series', 'Miniseries'].includes(category)) return 'tv';
+  return 'other'; // commercials, voice, theatre — not screen-awards eligible
 }
 
 // ---- Legacy / Hall of Fame -------------------------------------------------
@@ -458,18 +485,18 @@ export const LIFETIME_ACHIEVEMENT_MIN = 480;
 // One-time purchases. On buy: a fame/reputation bump (you're seen succeeding).
 // Ongoing: weekly upkeep (a money sink) and a comfort bonus to weekly energy.
 export const ASSETS = [
-  { key: 'car', name: 'Sports Car', icon: '🏎️', cost: 60000, upkeep: 90, fame: 2, rep: 1, energy: 0, desc: 'Turn heads on the boulevard.' },
-  { key: 'condo', name: 'Hillside Condo', icon: '🏠', cost: 180000, upkeep: 250, fame: 3, rep: 2, energy: 3, desc: 'A comfortable home base.' },
-  { key: 'art', name: 'Art Collection', icon: '🖼️', cost: 400000, upkeep: 300, fame: 3, rep: 4, energy: 0, desc: 'Cultured cachet among the elite.' },
-  { key: 'mansion', name: 'Hollywood Mansion', icon: '🏡', cost: 900000, upkeep: 1400, fame: 7, rep: 3, energy: 5, desc: 'The address that says you\'ve arrived.' },
-  { key: 'yacht', name: 'Luxury Yacht', icon: '🛥️', cost: 1800000, upkeep: 2800, fame: 8, rep: 2, energy: 3, desc: 'Float above it all.' },
-  { key: 'jet', name: 'Private Jet', icon: '✈️', cost: 6000000, upkeep: 7000, fame: 10, rep: 4, energy: 6, desc: 'The ultimate flex.' },
+  { key: 'car', name: 'Sports Car', icon: '🏎️', cost: 250000, upkeep: 1200, fame: 2, rep: 1, energy: 0, desc: 'Turn heads on the boulevard.' },
+  { key: 'condo', name: 'Hillside Condo', icon: '🏠', cost: 1500000, upkeep: 4000, fame: 3, rep: 2, energy: 3, desc: 'A comfortable home base.' },
+  { key: 'art', name: 'Art Collection', icon: '🖼️', cost: 4000000, upkeep: 5000, fame: 3, rep: 4, energy: 0, desc: 'Cultured cachet among the elite.' },
+  { key: 'mansion', name: 'Hollywood Mansion', icon: '🏡', cost: 12000000, upkeep: 20000, fame: 7, rep: 3, energy: 5, desc: 'The address that says you\'ve arrived.' },
+  { key: 'yacht', name: 'Luxury Yacht', icon: '🛥️', cost: 40000000, upkeep: 45000, fame: 8, rep: 2, energy: 3, desc: 'Float above it all.' },
+  { key: 'jet', name: 'Private Jet', icon: '✈️', cost: 120000000, upkeep: 110000, fame: 10, rep: 4, energy: 6, desc: 'The ultimate flex.' },
 ];
 
-// Progressive annual income tax.
+// Progressive annual income tax (Hollywood-scale brackets).
 export function taxFor(income) {
   if (income <= 0) return 0;
-  const brackets = [[50000, 0.10], [150000, 0.22], [400000, 0.32], [Infinity, 0.40]];
+  const brackets = [[100000, 0.10], [500000, 0.24], [2000000, 0.35], [Infinity, 0.45]];
   let tax = 0, prev = 0;
   for (const [cap, rate] of brackets) {
     if (income <= prev) break;
@@ -483,12 +510,12 @@ export function taxFor(income) {
 // Career goals that guide the player and grant small rewards on completion.
 // `check(s)` is evaluated against game state; `reward` is applied once.
 export const MILESTONES = [
-  { key: 'first_job', icon: '🎬', name: 'First Day on Set', desc: 'Book any paying gig — even as an extra.', reward: { money: 150 }, check: (s) => (s.stats.extra || 0) > 0 || s.stats.landed > 0 },
+  { key: 'first_job', icon: '🎬', name: 'First Day on Set', desc: 'Book any paying gig — even as an extra.', reward: { money: 4000 }, check: (s) => (s.stats.extra || 0) > 0 || s.stats.landed > 0 },
   { key: 'first_class', icon: '📚', name: 'Trained Up', desc: 'Take your first class.', reward: { rep: 2 }, check: (s) => s.stats.classes > 0 },
-  { key: 'first_credit', icon: '🎞️', name: 'In the Credits', desc: 'Earn your first on-screen credit.', reward: { money: 300 }, check: (s) => s.filmography.length > 0 },
+  { key: 'first_credit', icon: '🎞️', name: 'In the Credits', desc: 'Earn your first on-screen credit.', reward: { money: 8000 }, check: (s) => s.filmography.length > 0 },
   { key: 'agent', icon: '🕴️', name: 'Represented', desc: 'Sign with a talent agent.', reward: { rep: 4 }, check: (s) => s.hasAgent },
-  { key: 'fame25', icon: '⭐', name: 'Recognizable', desc: 'Reach 25 fame.', reward: { money: 1000 }, check: (s) => s.fame >= 25 },
-  { key: 'first_lead', icon: '🎬', name: 'Leading Role', desc: 'Land a lead (top-billed) role.', reward: { money: 500 }, check: (s) => s.filmography.some((f) => f.acted && (f.billing === 'lead' || (f.lead && !f.billing))) },
+  { key: 'fame25', icon: '⭐', name: 'Recognizable', desc: 'Reach 25 fame.', reward: { money: 25000 }, check: (s) => s.fame >= 25 },
+  { key: 'first_lead', icon: '🎬', name: 'Leading Role', desc: 'Land a lead (top-billed) role.', reward: { money: 15000 }, check: (s) => s.filmography.some((f) => f.acted && (f.billing === 'lead' || (f.lead && !f.billing))) },
   { key: 'studio_film', icon: '🎥', name: 'Studio Player', desc: 'Appear in a studio film.', reward: { rep: 5 }, check: (s) => s.filmography.some((f) => f.category === 'Studio Film' && f.acted) },
   { key: 'streaming', icon: '📱', name: 'Streaming Star', desc: 'Appear in a streaming project.', reward: { rep: 4 }, check: (s) => s.filmography.some((f) => (f.category === 'Streaming Film' || f.category === 'Streaming Series') && f.acted) },
   { key: 'mansion', icon: '🏡', name: 'Living the Dream', desc: 'Buy a Hollywood mansion.', reward: { rep: 4 }, check: (s) => (s.assets || []).includes('mansion') },

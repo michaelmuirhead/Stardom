@@ -1,5 +1,5 @@
 // ui.js — rendering & event wiring
-import { CLASSES, GENRES, GENRE_KEYS, CEREMONIES, MILESTONES, BILLING, ASSETS, taxFor, fameTier } from './data.js';
+import { CLASSES, GENRES, GENRE_KEYS, CEREMONIES, MILESTONES, BILLING, ASSETS, fameTier } from './data.js';
 import {
   audition, auditionChance, takeClass, network, rest, sideJob, extraWork, toggleAgent,
   writeScript, sellScript, startProduction, estimateProduction, advanceWeek, isBusy, BUDGET_TIERS,
@@ -108,7 +108,7 @@ function renderStats() {
   const bar = $('#stats');
   bar.innerHTML = '';
   const items = [
-    ['💵', 'Money', money(S.money), S.money < 0 ? 'warn' : ''],
+    ['💵', 'Money', bigMoney(S.money), S.money < 0 ? 'warn' : ''],
     ['⭐', 'Fame', `${S.fame.toFixed(0)} · ${fameTier(S.fame)}`, ''],
     ['🎭', 'Acting', S.acting.toFixed(0), ''],
     ['🤝', 'Reputation', S.reputation.toFixed(0), ''],
@@ -481,15 +481,14 @@ function financesView() {
   wrap.appendChild(el('h2', null, '💰 Finances'));
 
   const upkeep = ownedAssets(S).reduce((t, a) => t + a.upkeep, 0);
-  const estTax = taxFor(S.yearIncome || 0);
   const summary = el('div', 'hof-grid');
   const stat = (lab, val) => `<div class="hof-stat"><span class="hof-val">${val}</span><span class="hof-lab">${lab}</span></div>`;
-  summary.innerHTML = stat('Net worth', money(S.money))
-    + stat('Income this yr', money(Math.round(S.yearIncome || 0)))
-    + stat('Est. tax due', money(estTax))
-    + stat('Weekly upkeep', money(diffOf(S).living + upkeep));
+  summary.innerHTML = stat('Net worth', bigMoney(S.money))
+    + stat('Income this yr', bigMoney(Math.round(S.yearIncome || 0)))
+    + stat('Tax withheld', bigMoney(Math.round(S.taxWithheld || 0)))
+    + stat('Weekly upkeep', bigMoney(diffOf(S).living + upkeep));
   wrap.appendChild(summary);
-  wrap.appendChild(el('p', 'muted small', 'Income is taxed each year (progressively). Lifestyle assets cost a fortune to maintain but boost your fame and status — live large, but keep the work coming.'));
+  wrap.appendChild(el('p', 'muted small', 'Income is taxed progressively, withheld as you earn (the figures above are gross). Lifestyle assets cost a fortune to maintain but boost your fame and status — live large, but keep the work coming.'));
 
   wrap.appendChild(el('h3', null, '🏛️ Lifestyle & Assets'));
   const grid = el('div', 'grid');
@@ -607,7 +606,7 @@ function careerView() {
 
   const meta = el('div', 'meta-row');
   meta.innerHTML = `<span>Agent: ${S.hasAgent ? '✅ Signed' : '— None'}</span>
-    <span>💵 Net worth: ${money(S.money)}</span>
+    <span>💵 Net worth: ${bigMoney(S.money)}</span>
     <span>🏅 Career prestige: ${Math.round(S.careerPrestige || 0)}</span>
     <span>Auditions: ${S.stats.auditions}</span>
     <span>Roles landed: ${S.stats.landed}</span>
@@ -715,7 +714,7 @@ function gameOverView() {
     + stat('Oscar wins', leg.oscarWins)
     + stat('Credits', S.filmography.length)
     + stat('Career prestige', Math.round(S.careerPrestige || 0))
-    + stat('Final net worth', money(S.money));
+    + stat('Final net worth', bigMoney(S.money));
   v.appendChild(grid);
 
   // Hall of Fame ladder

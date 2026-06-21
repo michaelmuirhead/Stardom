@@ -67,10 +67,15 @@ function spendEnergy(s, amount) {
   s.energy = clamp(s.energy - amount, 0, s.maxEnergy);
 }
 
-// All work income flows through here so it counts toward annual taxes.
+// All work income flows through here. Tax is withheld pay-as-you-earn at the
+// exact progressive marginal rate, so there's no year-end lump-sum shock.
 function earn(s, amount) {
-  s.money += amount;
-  s.yearIncome = (s.yearIncome || 0) + Math.max(0, amount);
+  if (amount <= 0) { s.money += amount; return; }
+  const before = s.yearIncome || 0;
+  s.yearIncome = before + amount;
+  const taxDelta = taxFor(s.yearIncome) - taxFor(before);
+  s.taxWithheld = (s.taxWithheld || 0) + taxDelta;
+  s.money += amount - taxDelta;   // take-home, after tax
 }
 
 // ---- Lifestyle assets ------------------------------------------------------
@@ -475,7 +480,7 @@ export function sideJob(s) {
   if (s.gameOver) return { ok: false, msg: 'The game is over.' };
   if (s.energy < 20) return { ok: false, msg: 'Too tired for a shift.' };
   spendEnergy(s, 20);
-  const pay = 250 + Math.floor(Math.random() * 200);
+  const pay = 2500 + Math.floor(Math.random() * 1500);
   earn(s, pay);
   pushLog(s, `🍽️ Worked a serving shift. +$${pay}.`);
   return { ok: true, msg: `Earned $${pay}.` };
@@ -484,7 +489,7 @@ export function sideJob(s) {
 // Background/extra work: the always-available on-theme floor gig. It roughly
 // keeps the lights on (a profit on Easy, a slow bleed on Normal, brutal on Hard)
 // while building a little craft — enough to survive on, never enough to escape.
-const EXTRA_PAY = 200;
+const EXTRA_PAY = 1400;
 const EXTRA_ENERGY = 14;
 export function extraWork(s) {
   if (s.gameOver) return { ok: false, msg: 'The game is over.' };
@@ -597,9 +602,9 @@ export function sellScript(s, scriptId) {
 // Produce a project (optionally directing it & using your own script).
 // budget tiers determine cost & potential return.
 export const BUDGET_TIERS = [
-  { key: 'micro', name: 'Micro-budget', cost: 5000, scale: 1 },
-  { key: 'mid', name: 'Mid-budget', cost: 25000, scale: 4 },
-  { key: 'big', name: 'Blockbuster', cost: 120000, scale: 16 },
+  { key: 'micro', name: 'Micro-budget', cost: 400000, scale: 1 },
+  { key: 'mid', name: 'Mid-budget', cost: 6000000, scale: 4 },
+  { key: 'big', name: 'Blockbuster', cost: 60000000, scale: 16 },
 ];
 
 // Quality of a production before luck — shared by the wrap logic and the UI
@@ -1072,13 +1077,15 @@ export function advanceWeek(s) {
     s.year++;
     s.age++;
     updateRivals(s);
-    // Annual income tax on the year's gross earnings.
-    const tax = taxFor(s.yearIncome || 0);
-    if (tax > 0) {
-      s.money -= tax;
-      pushLog(s, `🧾 Tax season: paid $${tax.toLocaleString()} on $${Math.round(s.yearIncome).toLocaleString()} of income.`);
+    // Tax was withheld as you earned; just reconcile (≈0) and reset for the year.
+    const owed = taxFor(s.yearIncome || 0);
+    const settle = owed - (s.taxWithheld || 0);
+    if (settle !== 0) s.money -= settle;
+    if ((s.yearIncome || 0) > 0) {
+      pushLog(s, `🧾 Tax year closed: $${owed.toLocaleString()} paid on $${Math.round(s.yearIncome).toLocaleString()} of income.`);
     }
     s.yearIncome = 0;
+    s.taxWithheld = 0;
     pushLog(s, `📅 A new year begins. You are now ${s.age}.`);
   }
 
