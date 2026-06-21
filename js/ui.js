@@ -490,6 +490,19 @@ function financesView() {
   wrap.appendChild(summary);
   wrap.appendChild(el('p', 'muted small', 'Income is taxed progressively, withheld as you earn (the figures above are gross). Lifestyle assets cost a fortune to maintain but boost your fame and status — live large, but keep the work coming.'));
 
+  // Royalties / residuals
+  const roy = S.royalties || [];
+  if (roy.length) {
+    const weeklyTotal = roy.reduce((t, r) => t + r.weekly, 0);
+    wrap.appendChild(el('h3', null, `💸 Royalties — ${bigMoney(weeklyTotal)}/wk`));
+    wrap.appendChild(el('p', 'muted small', 'Residuals from your past hits, paid weekly and fading over time.'));
+    const ul = el('ul', 'list');
+    for (const r of [...roy].sort((a, b) => b.weekly - a.weekly).slice(0, 8)) {
+      ul.appendChild(el('li', null, `<b>${r.title}</b> <span class="muted">— ${bigMoney(r.weekly)}/wk · ${r.weeksLeft} wk left</span>`));
+    }
+    wrap.appendChild(ul);
+  }
+
   wrap.appendChild(el('h3', null, '🏛️ Lifestyle & Assets'));
   const grid = el('div', 'grid');
   for (const a of ASSETS) {

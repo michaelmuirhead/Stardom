@@ -78,6 +78,34 @@ function earn(s, amount) {
   s.money += amount - taxDelta;   // take-home, after tax
 }
 
+// ---- Royalties / residuals -------------------------------------------------
+// Hired talent doesn't get box office, but a hit pays residuals for years.
+// Grants a decaying weekly trickle scaled to the release's success & your billing.
+function grantRoyalty(s, title, result, billing) {
+  if (!result) return;
+  const bf = billing === 'lead' ? 1 : billing === 'supporting' ? 0.4 : billing === 'cameo' ? 0.12 : 0.6;
+  const weekly0 = result.type === 'box'
+    ? Math.round(result.value * 0.00006 * bf)   // ~0.2% of box office over its run
+    : Math.round(result.value * 220 * bf);       // viewership (millions) → $/wk
+  if (weekly0 < 100) return;                     // negligible — skip flops
+  if (!s.royalties) s.royalties = [];
+  s.royalties.push({ title, weekly: weekly0, weeksLeft: 104 });
+}
+
+// Pay out & decay residuals each week. Returns the week's total (for display).
+function payRoyalties(s) {
+  if (!s.royalties || !s.royalties.length) return 0;
+  let total = 0;
+  for (const r of s.royalties) {
+    earn(s, r.weekly);
+    total += r.weekly;
+    r.weekly = Math.round(r.weekly * 0.975); // ~2.5%/wk decay
+    r.weeksLeft--;
+  }
+  s.royalties = s.royalties.filter((r) => r.weeksLeft > 0 && r.weekly >= 50);
+  return total;
+}
+
 // ---- Lifestyle assets ------------------------------------------------------
 export function ownedAssets(s) {
   return ASSETS.filter((a) => (s.assets || []).includes(a.key));
@@ -387,6 +415,7 @@ function endSeason(s) {
   // Viewership (millions) scales with the rating.
   const viewers = +(3 + sh.ratings / 100 * 18 * rf(0.8, 1.3)).toFixed(1);
   const seasonNo = sh.season;
+  grantRoyalty(s, `${sh.title} S${seasonNo}`, { type: 'views', value: viewers }, 'lead');
 
   if (Math.random() < renewChance) {
     sh.season++;
@@ -997,6 +1026,9 @@ export function advanceWeek(s) {
   // Living expenses (base + lifestyle upkeep)
   s.money -= D.living + lifestyleUpkeep(s);
 
+  // Residual income from past hits
+  payRoyalties(s);
+
   // Active acting role progresses
   if (s.active) {
     const a = s.active;
@@ -1027,6 +1059,7 @@ export function advanceWeek(s) {
         result: isAd ? null : projectResult(a.role.catName, a.role.tier, quality, s.fame),
       });
       const cred = s.filmography[s.filmography.length - 1];
+      if (!isAd) grantRoyalty(s, a.role.title, cred.result, a.role.billing);
       const recMsg = rec ? ` ${rec.emoji} ${rec.label} (quality ${quality}).` : '';
       pushLog(s, `🎉 "${a.role.title}" wrapped!${recMsg} +${fameGain} fame, +${a.role.skillGain} acting.`);
       if (!isAd) {

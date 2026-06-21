@@ -31,7 +31,9 @@ export function newGame(playerName, difficultyKey) {
 
     careerPrestige: 0,   // cumulative prestige across your whole career
     assets: [],          // owned lifestyle assets (keys)
+    royalties: [],       // decaying residual income from past hits
     yearIncome: 0,       // gross income this year (for taxes)
+    taxWithheld: 0,      // tax withheld so far this year
     milestonesDone: {},  // milestone key -> year completed
     stats: { auditions: 0, landed: 0, classes: 0, seasons: 0, wins: 0, noms: 0, written: 0, extra: 0 },
     gameOver: false,
