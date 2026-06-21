@@ -20,6 +20,18 @@ Enter a stage name (or leave blank for a random one), pick a **difficulty**,
 and start your career. Progress autosaves to your browser — use **Continue**
 to resume.
 
+### Install on your phone (PWA)
+
+Stardom is an installable Progressive Web App with offline support. On a
+deployed (HTTPS) build:
+
+- **iPhone/iPad (Safari):** tap **Share → Add to Home Screen**. It launches
+  full-screen with its own icon, no browser chrome.
+- **Android (Chrome):** use the **Install app** prompt / menu item.
+
+A service worker caches the app shell so it keeps working offline, and your
+career is saved locally on the device.
+
 ### Difficulty
 
 | Mode | Start $ | Weekly cost | Pay | Audition odds | Bankruptcy at |
