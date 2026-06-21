@@ -5,7 +5,7 @@ import {
   writeScript, sellScript, startProduction, estimateProduction, advanceWeek, isBusy, BUDGET_TIERS,
   catchUp, quitSeries, specialty, diffOf, agentReady, AGENT_FAME_REQ, AGENT_CREDITS_REQ,
   retire, careerLegacy, checkMilestones, typecastInfo, negotiate, resolveChoice,
-  buyAsset, ownedAssets,
+  buyAsset, ownedAssets, prepareRole,
 } from './engine.js';
 
 let S = null;        // current game state
@@ -121,9 +121,11 @@ function renderBanner() {
   if (S.active) {
     const a = S.active;
     const cs = (a.costars || []).map((c) => c.name).join(', ');
-    parts.push(progressCard(`${a.role.genreIcon} Filming "${a.role.title}" — ${a.role.part}`,
+    const card = progressCard(`${a.role.genreIcon} Filming "${a.role.title}" — ${a.role.part}`,
       a.totalWeeks - a.weeksLeft, a.totalWeeks, `${a.weeksLeft} wk left`,
-      cs ? `with ${cs}` : ''));
+      cs ? `with ${cs}` : '');
+    card.appendChild(prepControl(a));
+    parts.push(card);
   }
   if (S.activeSeries && S.activeSeries.status === 'filming') {
     const sh = S.activeSeries;
@@ -131,19 +133,33 @@ function renderBanner() {
     const card = progressCard(`📡 "${sh.title}" — Season ${sh.season}`,
       sh.totalWeeks - sh.weeksLeft, sh.totalWeeks, `${sh.weeksLeft} wk left`,
       `${cs ? 'with ' + cs : ''}${sh.ratings ? ' · last rating ' + sh.ratings : ''}`);
+    card.appendChild(prepControl(sh));
     const quit = actionBtn('🚪 Leave the show', () => { if (confirm('Leave this series for good?')) act(quitSeries(S)); });
     quit.classList.add('mini');
     card.appendChild(quit);
     parts.push(card);
   }
   for (const p of S.productions) {
-    parts.push(progressCard(`${p.genreIcon || '🎥'} Producing "${p.title}" (${p.budgetName})`, p.totalWeeks - p.weeksLeft, p.totalWeeks, `${p.weeksLeft} wk left`));
+    const card = progressCard(`${p.genreIcon || '🎥'} Producing "${p.title}" (${p.budgetName})${p.star ? ' — starring you' : ''}`, p.totalWeeks - p.weeksLeft, p.totalWeeks, `${p.weeksLeft} wk left`);
+    if (p.star) card.appendChild(prepControl(p));
+    parts.push(card);
   }
   if (!parts.length) {
     b.appendChild(el('div', 'banner-idle', '🟢 You\'re free this week — audition, train, or create.'));
     return;
   }
   parts.forEach((p) => b.appendChild(p));
+}
+
+// Rehearse control shown on the project you're currently filming.
+function prepControl(proj) {
+  const prep = proj.prep || 0;
+  const wrap = el('div', 'prep-row');
+  wrap.innerHTML = `<span class="muted small">🎭 Prep ${prep}/4</span>`;
+  const btn = actionBtn('Rehearse (18⚡)', () => act(prepareRole(S)), prep >= 4 || S.energy < 18);
+  btn.classList.add('mini');
+  wrap.appendChild(btn);
+  return wrap;
 }
 
 function progressCard(label, done, total, right, sub) {
@@ -336,7 +352,7 @@ function createView() {
 
 function producerForm() {
   const block = el('div', 'panel-block');
-  const state = { budgetKey: 'micro', scriptId: '', direct: false };
+  const state = { budgetKey: 'micro', scriptId: '', direct: false, star: false };
 
   // Budget select
   const bSel = el('select', 'select');
@@ -369,6 +385,14 @@ function producerForm() {
   dirLabel.appendChild(document.createTextNode(
     S.directing < 5 ? ' Also direct (needs directing 5+)' : ' Also direct it (+prestige)'));
 
+  // Star-in-it checkbox (full auteur)
+  const starLabel = el('label', 'check');
+  const starBox = document.createElement('input');
+  starBox.type = 'checkbox';
+  starBox.onchange = () => { state.star = starBox.checked; update(); };
+  starLabel.appendChild(starBox);
+  starLabel.appendChild(document.createTextNode(' Star in it (your acting boosts quality; you can rehearse during the shoot)'));
+
   // Live projection + affordability-gated greenlight
   const preview = el('div', 'estimate');
   const go = el('button', 'btn primary', '🎬 Greenlight production');
@@ -392,6 +416,7 @@ function producerForm() {
   block.appendChild(labeled('Budget', bSel));
   block.appendChild(labeled('Script', sSel));
   block.appendChild(dirLabel);
+  block.appendChild(starLabel);
   block.appendChild(preview);
   block.appendChild(go);
   block.appendChild(el('p', 'muted small', 'Producing ties up no energy but locks in your money. Projections ignore luck — actual results swing higher or lower. Each production also builds your affinity in its genre.'));
@@ -591,7 +616,8 @@ function careerView() {
   else {
     const ul = el('ul', 'list');
     for (const f of [...S.filmography].reverse()) {
-      ul.appendChild(el('li', null, `<b>${f.title}</b> — ${f.role} <span class="muted">(${f.genre ? f.genre + ' ' : ''}${f.category}, Yr ${f.year})</span>${f.quality != null ? ` <span class="qchip">★ ${f.quality}</span>` : ''}`));
+      const rec = f.reception ? ` <span class="muted small">· ${f.reception}</span>` : '';
+      ul.appendChild(el('li', null, `<b>${f.title}</b> — ${f.role} <span class="muted">(${f.genre ? f.genre + ' ' : ''}${f.category}, Yr ${f.year})</span>${f.quality != null ? ` <span class="qchip">★ ${f.quality}</span>` : ''}${rec}`));
     }
     wrap.appendChild(ul);
   }

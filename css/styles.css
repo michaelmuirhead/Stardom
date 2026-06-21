@@ -112,6 +112,7 @@ header {
   padding: 10px 14px; margin-bottom: 8px;
 }
 .banner-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-weight: 600; }
+.prep-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
 
 main {
   display: grid; grid-template-columns: 1fr 320px; gap: 16px;
