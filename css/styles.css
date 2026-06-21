@@ -311,6 +311,7 @@ footer {
 .modal-ic { font-size: 48px; }
 .modal-card h2 { margin: 6px 0 2px; }
 .modal-list { text-align: left; margin: 16px 0; }
+.bid-list li { animation: fade .25s ease; }
 .modal-headline { font-weight: 700; font-size: 17px; margin: 8px 0 16px; }
 .modal-headline.good { color: var(--gold2); }
 .modal-text { color: var(--txt); line-height: 1.5; margin: 10px 0 18px; }

@@ -143,6 +143,9 @@ export const FIRST_NAMES = ['Ava', 'Liam', 'Sofia', 'Noah', 'Mia', 'Ethan', 'Isl
 export const LAST_NAMES = ['Vance', 'Cross', 'Marlowe', 'Sterling', 'Quinn', 'Frost',
   'Rivera', 'Hale', 'Beaumont', 'Cole', 'Ashford', 'Knight', 'Lang', 'Monroe'];
 
+export const STUDIOS = ['Apex Pictures', 'Meridian Studios', 'Lumen Films', 'Vanguard Pictures',
+  'Nova Entertainment', 'Atlas Films', 'Silverpeak Studios', 'Onyx Pictures', 'Crown & Co.', 'Halcyon Media'];
+
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const ri = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 const rf = (a, b) => a + Math.random() * (b - a);

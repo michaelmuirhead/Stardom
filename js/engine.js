@@ -3,7 +3,7 @@ import {
   WEEKS_PER_YEAR, AGENT_CUT, CLASSES, EVENTS,
   DIFFICULTIES, GENRES, GENRE_KEYS, CEREMONIES, creditMedium,
   HALL_OF_FAME, LIFETIME_ACHIEVEMENT_MIN, MILESTONES, CHOICE_EVENTS,
-  ASSETS, taxFor, CATEGORIES, fameQuote,
+  ASSETS, taxFor, CATEGORIES, fameQuote, STUDIOS,
   projectTitle, makeRole, makeCostar, makeRival,
 } from './data.js';
 import { pushLog, refreshOffers } from './state.js';
@@ -633,6 +633,21 @@ export function writeScript(s) {
   return { ok: true, msg: `Wrote "${script.title}".` };
 }
 
+// Build a (display-only) sequence of studio bids that escalate to the final price.
+function buildBids(base, finalPrice, war) {
+  const pool = [...STUDIOS].sort(() => Math.random() - 0.5);
+  if (!war) return { bids: [{ studio: pool[0], bid: finalPrice }], winner: pool[0] };
+  const n = 2 + Math.floor(Math.random() * 3);   // 2-4 rival studios
+  const steps = n + 1;
+  const bids = [];
+  let cur = Math.round(base * 0.6);
+  for (let i = 0; i < steps; i++) {
+    cur = i === steps - 1 ? finalPrice : Math.round(cur + (finalPrice - cur) * rf(0.3, 0.6));
+    bids.push({ studio: pool[i % n], bid: cur });
+  }
+  return { bids, winner: bids[bids.length - 1].studio };
+}
+
 // Pitch a script to studios. Attach yourself as star/director/producer (gated by
 // skill/fame). Returns rejection, a single offer, or a bidding war. On a deal you
 // get a (fame/quality-scaled) sale price; if you attached creative roles, the
@@ -682,6 +697,8 @@ export function pitchScript(s, scriptId, attach = {}) {
     pushLog(s, war
       ? `🔥 BIDDING WAR over "${sc.title}"! Sold for $${price.toLocaleString()}. You keep the writing credit.`
       : `💰 Sold "${sc.title}" to a studio for $${price.toLocaleString()}. You keep the writing credit.`);
+    const sale = buildBids(base, price, war);
+    s.pitchNight = { title: sc.title, genre: sc.genreName, war, price, greenlit: false, attach: want, bids: sale.bids, winner: sale.winner };
     return { ok: true, war, price, msg: war ? `Bidding war! Sold for $${price.toLocaleString()}.` : `Sold for $${price.toLocaleString()}.` };
   }
 
@@ -706,6 +723,8 @@ export function pitchScript(s, scriptId, attach = {}) {
   pushLog(s, war
     ? `🔥 BIDDING WAR over "${sc.title}"! Sold for $${price.toLocaleString()} and greenlit with you attached (${hats}). Filming begins.`
     : `🎬 "${sc.title}" sold for $${price.toLocaleString()} and greenlit with you attached (${hats}). Filming begins.`);
+  const sale = buildBids(base, price, war);
+  s.pitchNight = { title: sc.title, genre: sc.genreName, war, price, greenlit: true, attach: want, bids: sale.bids, winner: sale.winner };
   return { ok: true, war, price, greenlit: true, msg: war ? `Bidding war! "${sc.title}" greenlit.` : `"${sc.title}" greenlit.` };
 }
 
@@ -1099,6 +1118,21 @@ export function checkMilestones(s) {
     newly.push(m);
   }
   return newly;
+}
+
+// Lifetime box office (films) and total viewership (TV/streaming) across all credits.
+export function careerTotals(s) {
+  let boxOffice = 0, viewers = 0, biggest = null;
+  for (const f of s.filmography) {
+    if (!f.result) continue;
+    if (f.result.type === 'box') {
+      boxOffice += f.result.value;
+      if (!biggest || f.result.value > biggest.value) biggest = { title: f.title, value: f.result.value };
+    } else {
+      viewers += f.result.value;
+    }
+  }
+  return { boxOffice, viewers: Math.round(viewers), biggest };
 }
 
 // ---- Legacy / retirement ---------------------------------------------------

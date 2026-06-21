@@ -154,7 +154,8 @@ and producing (which unlock as your fame grows).
 - 📣 **Pitch scripts to studios** — choose what to **attach yourself as** (Star /
   Director / Producer, gated by skill & fame). Studios may **pass**, make a
   **single offer**, or — for a hot script and a bankable name — spark a **bidding
-  war** that drives the price into the millions. A writer-only pitch is a clean
+  war** (shown in a live reveal as studios escalate their bids) that drives the
+  price into the millions. A writer-only pitch is a clean
   sale; attach creative roles and the studio greenlights the film with you in it,
   which then films and **releases** (box office, reception, residuals, a credit
   with every hat you wore). Attaching an unbankable you scares studios off.
@@ -201,7 +202,9 @@ reputation, then ranks you in the **Hall of Fame**:
 🏆 Hollywood Legend → 👑 Immortal Icon
 
 A sufficiently storied career is honored with a **🎖️ Lifetime Achievement Award**.
-The ending screen shows a full legacy scorecard.
+The ending screen shows a full legacy scorecard, including your **lifetime box
+office** and **total viewership** across everything you ever appeared in (also
+shown on the Career page).
 
 **Watch the money.** Weekly living costs never stop. Go broke and your career
 ends — work side jobs to stay afloat between gigs.

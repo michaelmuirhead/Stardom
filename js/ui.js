@@ -4,7 +4,7 @@ import {
   audition, auditionChance, takeClass, network, rest, sideJob, extraWork, toggleAgent,
   writeScript, pitchScript, startProduction, estimateProduction, advanceWeek, isBusy, BUDGET_TIERS,
   catchUp, quitSeries, specialty, diffOf, agentReady, AGENT_FAME_REQ, AGENT_CREDITS_REQ,
-  retire, careerLegacy, checkMilestones, typecastInfo, negotiate, resolveChoice,
+  retire, careerLegacy, careerTotals, checkMilestones, typecastInfo, negotiate, resolveChoice,
   buyAsset, ownedAssets, prepareRole, negotiateRenewal,
 } from './engine.js';
 
@@ -635,9 +635,12 @@ function careerView() {
     wrap.appendChild(el('p', 'muted small', 'More experience in a genre raises your audition odds for similar roles — and defines your public brand. Spread too thin in one and you risk being typecast.'));
   }
 
+  const tot = careerTotals(S);
   const meta = el('div', 'meta-row');
   meta.innerHTML = `<span>Agent: ${S.hasAgent ? '✅ Signed' : '— None'}</span>
     <span>💵 Net worth: ${bigMoney(S.money)}</span>
+    <span>🎬 Lifetime box office: ${bigMoney(tot.boxOffice)}</span>
+    <span>📺 Total viewers: ${tot.viewers}M</span>
     <span>🏅 Career prestige: ${Math.round(S.careerPrestige || 0)}</span>
     <span>Auditions: ${S.stats.auditions}</span>
     <span>Roles landed: ${S.stats.landed}</span>
@@ -736,15 +739,16 @@ function gameOverView() {
   // Legacy scorecard
   const wins = S.awards.filter((a) => a.won).length;
   const noms = S.awards.filter((a) => !a.won).length;
+  const tot = careerTotals(S);
   const grid = el('div', 'hof-grid');
   const stat = (lab, val) => `<div class="hof-stat"><span class="hof-val">${val}</span><span class="hof-lab">${lab}</span></div>`;
   grid.innerHTML = stat('Legacy score', leg.score)
     + stat('Peak fame', `${S.fame.toFixed(0)}`)
     + stat('Award wins', wins)
-    + stat('Nominations', noms)
     + stat('Oscar wins', leg.oscarWins)
+    + stat('Lifetime box office', bigMoney(tot.boxOffice))
+    + stat('Total viewers', `${tot.viewers}M`)
     + stat('Credits', S.filmography.length)
-    + stat('Career prestige', Math.round(S.careerPrestige || 0))
     + stat('Final net worth', bigMoney(S.money));
   v.appendChild(grid);
 
@@ -762,9 +766,45 @@ function renderModals() {
   const existing = document.querySelector('#modal');
   if (existing) existing.remove();
   if (S.gameOver) return;
-  if (S.releaseNight) buildReleaseModal();
+  if (S.pitchNight) buildPitchModal();
+  else if (S.releaseNight) buildReleaseModal();
   else if (S.ceremonyNight) buildCeremonyModal();
   else if (S.pendingChoice) buildChoiceModal();
+}
+
+// Animated bidding-war / sale reveal after pitching a script.
+function buildPitchModal() {
+  const p = S.pitchNight;
+  const { overlay, card } = modalShell();
+  card.appendChild(el('div', 'modal-ic', p.war ? '🔥' : '📣'));
+  card.appendChild(el('h2', null, `"${p.title}"`));
+  card.appendChild(el('p', 'muted', p.war ? 'A bidding war breaks out!' : 'Taking it to studios…'));
+  const list = el('ul', 'list modal-list bid-list');
+  card.appendChild(list);
+  const footer = el('div');
+  card.appendChild(footer);
+
+  const close = () => { S.pitchNight = null; if (onMutate) onMutate(S); overlay.remove(); render(); };
+
+  let i = 0;
+  const showNext = () => {
+    if (!document.body.contains(overlay)) return;
+    if (i < p.bids.length) {
+      const b = p.bids[i];
+      const last = i === p.bids.length - 1;
+      const li = el('li', last ? 'award-win' : '',
+        `${last ? '🏆 SOLD to' : '💬'} <b>${b.studio}</b> <span class="muted">— ${bigMoney(b.bid)}</span>`);
+      list.appendChild(li);
+      i++;
+      setTimeout(showNext, last ? 250 : 550);
+    } else {
+      footer.appendChild(el('p', 'modal-headline good',
+        `${p.greenlit ? '🎬 Greenlit — ' : ''}${bigMoney(p.price)}${p.greenlit ? ' + you\'re attached!' : ' for the script'}`));
+      const btn = actionBtn('Continue', close); btn.classList.add('primary');
+      footer.appendChild(btn);
+    }
+  };
+  showNext();
 }
 
 function buildReleaseModal() {

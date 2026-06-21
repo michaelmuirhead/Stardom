@@ -6,7 +6,7 @@ import { DIFFICULTIES, GENRE_KEYS, makeRole, taxFor } from '../js/data.js';
 import {
   advanceWeek, audition, auditionChance, takeClass, network, rest, sideJob,
   extraWork, toggleAgent, writeScript, startProduction, isBusy, catchUp, quitSeries,
-  agentReady, negotiate, resolveChoice, buyAsset, ownedAssets,
+  agentReady, negotiate, resolveChoice, buyAsset, ownedAssets, pitchScript, careerTotals,
 } from '../js/engine.js';
 
 let failures = 0;
@@ -268,6 +268,22 @@ assert(aw.milestones >= 6, `career milestones are completed over a long career (
   assert(r.ok && ownedAssets(s).some((a) => a.key === 'mansion'), 'lifestyle assets can be purchased');
   s.money = 20000000; advanceWeek(s);
   assert(s.money < 20000000, 'asset upkeep is charged weekly');
+}
+
+// 8) Script pitching + lifetime totals
+{
+  const s = newGame('Auteur', 'easy');
+  s.writing = 85; s.fame = 85; s.acting = 85; s.directing = 60; s.producing = 60; s.reputation = 75; s.money = 1e6;
+  let greenlit = false;
+  for (let k = 0; k < 15 && !greenlit; k++) {
+    s.energy = 100;
+    pitchScript(s, (s.scripts[0] || (writeScript(s), s.scripts[0])).id, { star: true, direct: true });
+    if (s.active && s.active.project) { greenlit = true; let g = 0; while (s.active && g++ < 20) { s.money = 1e6; advanceWeek(s); } }
+    else if (!s.scripts.length) writeScript(s);
+  }
+  assert(greenlit, 'a bankable auteur can pitch & greenlight a film with attachments');
+  const t = careerTotals(s);
+  assert(t.boxOffice > 0, `lifetime box office accrues from releases ($${Math.round(t.boxOffice).toLocaleString()})`);
 }
 
 console.log('');
