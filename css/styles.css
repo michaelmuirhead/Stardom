@@ -18,17 +18,21 @@
 }
 
 * { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 html, body { margin: 0; height: 100%; }
 body {
   font-family: 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
   background: radial-gradient(1200px 600px at 70% -10%, #20223a 0%, var(--bg) 55%);
   color: var(--txt);
   font-size: 15px;
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* ---- Start screen ---- */
 .start {
   min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   place-items: center;
   padding: 24px;
@@ -57,7 +61,7 @@ body {
 .start-field input {
   width: 100%; padding: 12px 14px; border-radius: 10px;
   border: 1px solid var(--line); background: var(--card); color: var(--txt);
-  font-size: 15px;
+  font-size: 16px; /* >=16px avoids iOS auto-zoom on focus */
 }
 .start-actions { display: flex; gap: 12px; justify-content: center; margin-bottom: 16px; }
 
@@ -77,6 +81,9 @@ header {
   display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
   padding: 12px 20px; background: var(--bg2); border-bottom: 1px solid var(--line);
   position: sticky; top: 0; z-index: 5;
+  padding-top: calc(12px + env(safe-area-inset-top));
+  padding-left: calc(20px + env(safe-area-inset-left));
+  padding-right: calc(20px + env(safe-area-inset-right));
 }
 .brand {
   font-weight: 800; letter-spacing: 2px; color: var(--gold); font-size: 18px;
@@ -181,8 +188,8 @@ main {
 .field { margin-bottom: 12px; }
 .field-lab { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
 .select {
-  width: 100%; padding: 9px 12px; border-radius: 8px;
-  background: var(--card); color: var(--txt); border: 1px solid var(--line); font-size: 14px;
+  width: 100%; padding: 10px 12px; border-radius: 8px;
+  background: var(--card); color: var(--txt); border: 1px solid var(--line); font-size: 16px;
 }
 .check { display: flex; align-items: center; gap: 8px; margin: 8px 0 14px; color: var(--txt); }
 
@@ -234,7 +241,8 @@ main {
 
 footer {
   position: sticky; bottom: 0; padding: 14px 20px;
-  background: linear-gradient(0deg, var(--bg2), transparent);
+  padding-bottom: calc(14px + env(safe-area-inset-bottom));
+  background: linear-gradient(0deg, var(--bg2) 60%, transparent);
   display: flex; justify-content: center;
 }
 
@@ -280,6 +288,7 @@ footer {
   background: var(--bg2); border: 1px solid var(--gold); border-radius: 16px;
   padding: 28px; max-width: 460px; width: 100%; text-align: center;
   box-shadow: 0 24px 70px rgba(0, 0, 0, .6);
+  max-height: 88dvh; overflow-y: auto;
 }
 .modal-ic { font-size: 48px; }
 .modal-card h2 { margin: 6px 0 2px; }
@@ -300,7 +309,46 @@ footer {
 .bill-supporting { background: #1d2533; color: #8fb7ff; border: 1px solid #2e3150; }
 .bill-cameo { background: #241d24; color: var(--muted); border: 1px solid var(--line); }
 
-#help { padding: 6px 12px; font-size: 16px; line-height: 1; }
+#help { margin-left: auto; padding: 6px 12px; font-size: 16px; line-height: 1; }
 
 .muted { color: var(--muted); }
 .small { font-size: 12px; }
+
+/* ---- Phones (iPhone-class) ---- */
+@media (max-width: 560px) {
+  header { gap: 8px; padding-left: calc(12px + env(safe-area-inset-left)); padding-right: calc(12px + env(safe-area-inset-right)); }
+  .brand { font-size: 15px; letter-spacing: 1px; }
+
+  /* Compact, two-row stat strip: icon + value only */
+  .stats { gap: 6px; order: 3; flex-basis: 100%; }
+  .stat { flex-direction: row; align-items: baseline; gap: 5px; min-width: 0; padding: 4px 9px; }
+  .stat-ic { font-size: 13px; }
+  .stat-lab { display: none; }
+  .stat-val { font-size: 13px; }
+
+  /* Tabs become a single horizontally-scrollable row */
+  .tabs { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding-bottom: 4px; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { flex: 0 0 auto; padding: 8px 13px; }
+
+  main { padding: 12px; gap: 12px; }
+  .banner { padding: 8px 12px 0; }
+  .view h2 { font-size: 18px; }
+
+  /* Log sits inline at the bottom on mobile, not sticky */
+  .log { position: static; top: auto; max-height: 300px; }
+
+  footer { padding-left: calc(12px + env(safe-area-inset-left)); padding-right: calc(12px + env(safe-area-inset-right)); }
+  footer .btn.big { width: 100%; }
+
+  .start { padding: 16px; }
+  .start-card { padding: 26px 22px; }
+  .logo { font-size: 38px; }
+  .start-actions { flex-direction: column; }
+  .start-actions .btn { width: 100%; }
+
+  .modal-overlay { padding: 14px; }
+  .modal-card { padding: 20px; }
+  .modal-ic { font-size: 40px; }
+  .hof-rank { font-size: 52px; }
+}
