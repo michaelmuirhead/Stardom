@@ -150,15 +150,21 @@ finale; you can also choose to leave the show at any time.
 and producing (which unlock as your fame grows).
 
 **Create your own work** in the Create tab once you've trained:
-- ✍️ **Write scripts** — sell them to studios, or produce them yourself. Each
-  script has a genre and sharpens your writing skill (you learn by doing).
-- 🎬 **Produce** films at micro / mid / blockbuster budgets. Box office depends
-  on script quality, your producing skill, and—if you also **direct**—your
-  directing skill. Each production also builds your affinity in its genre.
-- ⭐ **Star in your own film** — check "Star in it" to play the lead in a project
-  you write, direct, and produce. The full-auteur credit is eligible for Best
-  Actor, Director, Picture *and* Original Screenplay, and you can rehearse it
-  like any role.
+- ✍️ **Write scripts** — each has a genre and sharpens your writing skill.
+- 📣 **Pitch scripts to studios** — choose what to **attach yourself as** (Star /
+  Director / Producer, gated by skill & fame). Studios may **pass**, make a
+  **single offer**, or — for a hot script and a bankable name — spark a **bidding
+  war** that drives the price into the millions. A writer-only pitch is a clean
+  sale; attach creative roles and the studio greenlights the film with you in it,
+  which then films and **releases** (box office, reception, residuals, a credit
+  with every hat you wore). Attaching an unbankable you scares studios off.
+- 🎬 **Produce your own** films at micro / mid / blockbuster budgets (your own
+  studio), optionally **directing** and **starring** — full control, you keep the
+  box office.
+
+Salaries scale with your **fame "quote"** (a newcomer earns the baseline; an icon
+commands ~10× for the same role), a hit TV show's per-season fee **explodes** on
+renewal (negotiable), and your past hits pay **decaying royalties** for years.
 
 **Awards season** runs through the calendar with four real ceremonies, each
 judging your eligible credits from the trailing year:

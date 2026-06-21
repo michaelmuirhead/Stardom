@@ -2,7 +2,7 @@
 import { CLASSES, GENRES, GENRE_KEYS, CEREMONIES, MILESTONES, BILLING, ASSETS, fameTier } from './data.js';
 import {
   audition, auditionChance, takeClass, network, rest, sideJob, extraWork, toggleAgent,
-  writeScript, sellScript, startProduction, estimateProduction, advanceWeek, isBusy, BUDGET_TIERS,
+  writeScript, pitchScript, startProduction, estimateProduction, advanceWeek, isBusy, BUDGET_TIERS,
   catchUp, quitSeries, specialty, diffOf, agentReady, AGENT_FAME_REQ, AGENT_CREDITS_REQ,
   retire, careerLegacy, checkMilestones, typecastInfo, negotiate, resolveChoice,
   buyAsset, ownedAssets, prepareRole, negotiateRenewal,
@@ -339,14 +339,9 @@ function createView() {
   // Scripts owned
   if (S.scripts.length) {
     wrap.appendChild(el('h3', null, 'Your Scripts'));
+    wrap.appendChild(el('p', 'muted small', 'Pitch a script to studios. Attach yourself in creative roles to get cast/hired when it\'s made — but studios only attach a bankable name. Great scripts can spark a bidding war.'));
     const grid = el('div', 'grid');
-    for (const sc of S.scripts) {
-      const card = el('div', 'card');
-      card.innerHTML = `<div class="card-title">📄 ${sc.title}</div>
-        <div class="muted small">${sc.genreIcon ? sc.genreIcon + ' ' + sc.genreName + ' · ' : ''}Quality ${sc.quality}</div>`;
-      card.appendChild(actionBtn(`💰 Sell to studio (~${money(sc.quality * 220)})`, () => act(sellScript(S, sc.id))));
-      grid.appendChild(card);
-    }
+    for (const sc of S.scripts) grid.appendChild(scriptPitchCard(sc));
     wrap.appendChild(grid);
   }
 
@@ -358,6 +353,29 @@ function createView() {
     wrap.appendChild(producerForm());
   }
   return wrap;
+}
+
+function scriptPitchCard(sc) {
+  const attach = { star: false, direct: false, produce: false };
+  const card = el('div', 'card');
+  const estSale = sc.quality * 15000 * (0.6 + S.fame / 100);
+  card.innerHTML = `<div class="card-title">📄 ${sc.title}</div>
+    <div class="muted small">${sc.genreIcon ? sc.genreIcon + ' ' + sc.genreName + ' · ' : ''}Quality ${sc.quality} · est. ~${bigMoney(Math.round(estSale))}</div>`;
+
+  const mkCheck = (key, label, disabled, hint) => {
+    const lab = el('label', 'check small');
+    const box = document.createElement('input');
+    box.type = 'checkbox'; box.disabled = !!disabled;
+    box.onchange = () => { attach[key] = box.checked; };
+    lab.appendChild(box);
+    lab.appendChild(document.createTextNode(' ' + label + (hint ? ` ${hint}` : '')));
+    return lab;
+  };
+  card.appendChild(mkCheck('star', '⭐ Star', false, S.fame < 40 ? '(low fame — risky)' : ''));
+  card.appendChild(mkCheck('direct', '🎬 Direct', S.directing < 5, S.directing < 5 ? '(needs directing 5)' : ''));
+  card.appendChild(mkCheck('produce', '💼 Produce', S.producing < 5, S.producing < 5 ? '(needs producing 5)' : ''));
+  card.appendChild(actionBtn('📣 Pitch to studios', () => act(pitchScript(S, sc.id, attach)), isBusy(S)));
+  return card;
 }
 
 function producerForm() {

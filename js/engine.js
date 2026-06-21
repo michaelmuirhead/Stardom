@@ -3,7 +3,7 @@ import {
   WEEKS_PER_YEAR, AGENT_CUT, CLASSES, EVENTS,
   DIFFICULTIES, GENRES, GENRE_KEYS, CEREMONIES, creditMedium,
   HALL_OF_FAME, LIFETIME_ACHIEVEMENT_MIN, MILESTONES, CHOICE_EVENTS,
-  ASSETS, taxFor,
+  ASSETS, taxFor, CATEGORIES, fameQuote,
   projectTitle, makeRole, makeCostar, makeRival,
 } from './data.js';
 import { pushLog, refreshOffers } from './state.js';
@@ -633,23 +633,117 @@ export function writeScript(s) {
   return { ok: true, msg: `Wrote "${script.title}".` };
 }
 
-export function sellScript(s, scriptId) {
+// Pitch a script to studios. Attach yourself as star/director/producer (gated by
+// skill/fame). Returns rejection, a single offer, or a bidding war. On a deal you
+// get a (fame/quality-scaled) sale price; if you attached creative roles, the
+// studio greenlights the film and you make it (films over weeks → release).
+export function pitchScript(s, scriptId, attach = {}) {
+  if (s.gameOver) return { ok: false, msg: 'The game is over.' };
+  if (isBusy(s)) return { ok: false, msg: 'Finish your current project before pitching.' };
   const idx = s.scripts.findIndex((x) => x.id === scriptId);
   if (idx < 0) return { ok: false, msg: 'Script not found.' };
   const sc = s.scripts[idx];
-  const price = Math.round(sc.quality * 220 * rf(0.7, 1.3));
+  const want = { star: !!attach.star, direct: !!attach.direct, produce: !!attach.produce };
+  if (want.direct && s.directing < 5) return { ok: false, msg: 'You need directing skill to attach as director.' };
+  if (want.produce && s.producing < 5) return { ok: false, msg: 'You need producing skill to attach as producer.' };
+
+  // Studios love a great script; attaching an unbankable you scares them off.
+  let heat = sc.quality * 0.7 + s.reputation * 0.3 + s.fame * 0.35;
+  if (want.star && s.fame < 40) heat -= (40 - s.fame) * 0.6;     // not bankable as lead
+  if (want.direct && s.directing < 35) heat -= 8;
+  if (want.produce) heat -= 4;
+  const acceptChance = clamp(heat / 95, 0.05, 0.95);
+
+  if (Math.random() >= acceptChance) {
+    s.reputation = clamp(s.reputation - rf(0, 1.5), 0, 100);
+    const why = (want.star && s.fame < 40) ? ' (they wanted the script, not you attached as lead)' : '';
+    pushLog(s, `🚪 Studios passed on "${sc.title}"${why}. Keep shopping it.`);
+    return { ok: false, msg: `Passed on "${sc.title}".` };
+  }
+
+  // Hot scripts + a bankable name spark a bidding war.
+  const warChance = clamp((sc.quality - 55) / 70 + s.fame / 220, 0, 0.7);
+  const war = Math.random() < warChance;
+  const base = sc.quality * 15000 * (0.6 + s.fame / 100);
+  const priceMult = war ? rf(1.9, 4.0) : rf(0.85, 1.4);
+  const price = Math.round(base * priceMult);
   earn(s, price);
-  s.reputation = clamp(s.reputation + sc.quality / 30, 0, 100);
+  s.reputation = clamp(s.reputation + sc.quality / 25, 0, 100);
   s.scripts.splice(idx, 1);
-  // The studio makes the film — you keep an (Oscar-eligible) writing credit.
-  // Tracked separately so it doesn't inflate your on-screen filmography.
-  if (!s.writingCredits) s.writingCredits = [];
-  s.writingCredits.push({
-    title: sc.title, role: 'Writer', genre: sc.genreName, year: s.year, wk: absWeek(s),
-    medium: 'film', written: true, writeQuality: sc.quality, quality: sc.quality,
+
+  const anyAttach = want.star || want.direct || want.produce;
+  if (!anyAttach) {
+    // Writer-only sale → Oscar-eligible writing credit (kept off your on-screen list).
+    if (!s.writingCredits) s.writingCredits = [];
+    s.writingCredits.push({
+      title: sc.title, role: 'Writer', genre: sc.genreName, year: s.year, wk: absWeek(s),
+      medium: 'film', written: true, writeQuality: sc.quality, quality: sc.quality,
+    });
+    pushLog(s, war
+      ? `🔥 BIDDING WAR over "${sc.title}"! Sold for $${price.toLocaleString()}. You keep the writing credit.`
+      : `💰 Sold "${sc.title}" to a studio for $${price.toLocaleString()}. You keep the writing credit.`);
+    return { ok: true, war, price, msg: war ? `Bidding war! Sold for $${price.toLocaleString()}.` : `Sold for $${price.toLocaleString()}.` };
+  }
+
+  // Greenlit: the studio makes it with you attached. Film it like a role.
+  const cat = CATEGORIES.movie;
+  const roleFee = Math.round(cat.payBase * (want.star ? 1.5 : 0.5) * fameQuote(s.fame) * rf(0.85, 1.2));
+  const role = {
+    title: sc.title, category: 'movie', catName: 'Studio Film', icon: cat.icon,
+    genre: sc.genre, genreName: sc.genreName, genreIcon: sc.genreIcon,
+    billing: want.star ? 'lead' : 'supporting', part: want.star ? 'the Lead' : '(off-screen)',
+    tier: 2,
+    fameGain: +(cat.fameBase * 1.6 * (want.star ? 1.5 : 0.8)).toFixed(1),
+    skillGain: +(cat.skillBase * 1.2).toFixed(1),
+    prestige: +(cat.prestige * 1.3).toFixed(2),
+    pay: roleFee,
+  };
+  s.active = {
+    role, weeksLeft: 9, totalWeeks: 9, prep: 0,
+    costars: castCostars(s), project: true, attach: want, scriptQuality: sc.quality,
+  };
+  const hats = [want.star ? 'star' : null, want.direct ? 'direct' : null, want.produce ? 'produce' : null].filter(Boolean).join('/');
+  pushLog(s, war
+    ? `🔥 BIDDING WAR over "${sc.title}"! Sold for $${price.toLocaleString()} and greenlit with you attached (${hats}). Filming begins.`
+    : `🎬 "${sc.title}" sold for $${price.toLocaleString()} and greenlit with you attached (${hats}). Filming begins.`);
+  return { ok: true, war, price, greenlit: true, msg: war ? `Bidding war! "${sc.title}" greenlit.` : `"${sc.title}" greenlit.` };
+}
+
+// Wrap a pitched, self-attached studio project: blend the hats you wore into its
+// quality, then release it (box office, reception, residuals, credit).
+function wrapStudioProject(s, a) {
+  const at = a.attach;
+  let base = a.scriptQuality * 0.4 + (a.prep || 0) * 4;
+  base += at.star ? s.acting * 0.4 : 25;
+  if (at.direct) base += s.directing * 0.2;
+  if (at.produce) base += s.producing * 0.1;
+  const quality = clamp(Math.round(base * rf(0.8, 1.15)), 5, 100);
+  const rec = reception(quality);
+  const result = projectResult('Studio Film', 2, quality, s.fame);
+  bondWithCostars(s, a.costars || []);
+  const fameGain = +(a.role.fameGain * rec.fameMult).toFixed(1);
+  gainFame(s, fameGain);
+  if (at.star) s.acting = clamp(+(s.acting + a.role.skillGain).toFixed(1), 0, 100);
+  if (at.direct) s.directing = clamp(+(s.directing + 1).toFixed(1), 0, 100);
+  if (at.produce) s.producing = clamp(+(s.producing + 1).toFixed(1), 0, 100);
+  s.reputation = clamp(s.reputation + a.role.prestige * 2 + rec.rep, 0, 100);
+  s.careerPrestige += a.role.prestige;
+  awardGenreXp(s, a.role.genre, 1.5 + a.role.prestige);
+  const roles = [at.star ? 'Star' : null, at.direct ? 'Director' : null, at.produce ? 'Producer' : null, 'Writer'].filter(Boolean).join(' / ');
+  addCredit(s, {
+    title: a.role.title, category: 'Studio Film', role: roles, genre: a.role.genreName,
+    acted: !!at.star, billing: at.star ? 'lead' : undefined, lead: !!at.star,
+    directed: !!at.direct, produced: !!at.produce, written: true, writeQuality: a.scriptQuality,
+    costars: (a.costars || []).map((c) => c.id), quality, reception: rec.label, result,
   });
-  pushLog(s, `💰 Sold "${sc.title}" to a studio for $${price}. You keep the writing credit.`);
-  return { ok: true, msg: `Sold for $${price}.` };
+  grantRoyalty(s, a.role.title, result, at.star ? 'lead' : 'supporting');
+  pushLog(s, `🎞️ Your film "${a.role.title}" released — ${rec.emoji} ${rec.label} (quality ${quality}). +${fameGain} fame.`);
+  s.releaseNight = {
+    title: a.role.title, icon: a.role.genreIcon, category: 'Your Studio Film', role: roles,
+    genre: a.role.genreName, quality, reception: rec.label, emoji: rec.emoji,
+    result, fameGain, costars: (a.costars || []).map((c) => c.name),
+  };
+  s.active = null;
 }
 
 // Produce a project (optionally directing it & using your own script).
@@ -1056,11 +1150,13 @@ export function advanceWeek(s) {
   // Active acting role progresses
   if (s.active) {
     const a = s.active;
-    const weekly = Math.round(a.role.pay * D.payMult / a.totalWeeks);
+    const weekly = Math.round((a.role.pay || 0) * D.payMult / a.totalWeeks);
     const net = s.hasAgent ? Math.round(weekly * (1 - AGENT_CUT)) : weekly;
     earn(s, net);
     a.weeksLeft--;
-    if (a.weeksLeft <= 0) {
+    if (a.weeksLeft <= 0 && a.project) {
+      wrapStudioProject(s, a);
+    } else if (a.weeksLeft <= 0) {
       // Wrap: your performance quality + the project's reception shape the payoff.
       const starPower = bondWithCostars(s, a.costars || []);
       const rubOff = +(starPower * 0.04).toFixed(1);
