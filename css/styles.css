@@ -286,6 +286,13 @@ footer {
 .modal-list { text-align: left; margin: 16px 0; }
 .modal-headline { font-weight: 700; font-size: 17px; margin: 8px 0 16px; }
 .modal-headline.good { color: var(--gold2); }
+.modal-text { color: var(--txt); line-height: 1.5; margin: 10px 0 18px; }
+.choice-opts { display: flex; flex-direction: column; gap: 10px; }
+.choice-btn { width: 100%; text-align: left; padding: 12px 16px; }
+.choice-btn:hover:not(:disabled) { border-color: var(--gold); }
+
+.card-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.card-actions .btn { flex: 1; }
 
 .muted { color: var(--muted); }
 .small { font-size: 12px; }

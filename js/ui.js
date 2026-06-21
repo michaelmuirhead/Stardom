@@ -4,7 +4,7 @@ import {
   audition, auditionChance, takeClass, network, rest, sideJob, extraWork, toggleAgent,
   writeScript, sellScript, startProduction, estimateProduction, advanceWeek, isBusy, BUDGET_TIERS,
   catchUp, quitSeries, specialty, diffOf, agentReady, AGENT_FAME_REQ, AGENT_CREDITS_REQ,
-  retire, careerLegacy, checkMilestones, typecastInfo,
+  retire, careerLegacy, checkMilestones, typecastInfo, negotiate, resolveChoice,
 } from './engine.js';
 
 let S = null;        // current game state
@@ -191,7 +191,7 @@ function roleCard(r) {
       <div><div class="card-title">${r.title}</div>
       <div class="muted small">${r.genreIcon} ${r.genreName} ${r.catName} · ${r.part}${r.openCall ? ' · 📭 open call' : ''}</div></div></div>
     <div class="reqs">
-      <span>💵 ${money(r.pay)}</span>
+      <span>💵 ${money(r.pay)}${r.negotiated === 'up' ? ' 🤝' : ''}</span>
       <span>⭐ +${r.fameGain}</span>
       <span>🎭 +${r.skillGain}</span>
       <span>${r.category === 'tvshow' ? '📺 series' : '⏱️ ' + r.weeks + ' wk'}</span>
@@ -201,10 +201,14 @@ function roleCard(r) {
       <span>Needs fame ${r.fameReq}</span>
     </div>
     <div class="chance ${chCls}">Audition odds: ${chance}%</div>
-    ${offTypeNote(r)}`;
-  const btn = actionBtn(r.callback ? '🎟️ Callback audition (18⚡)' : '🎟️ Audition (18⚡)',
-    () => act(audition(S, r.id)), S.energy < 18);
-  c.appendChild(btn);
+    ${offTypeNote(r)}
+    ${r.negotiated === 'down' ? '<div class="bad small">😬 Casting cooled after a failed negotiation.</div>' : ''}`;
+  const row = el('div', 'card-actions');
+  row.appendChild(actionBtn(r.callback ? '🎟️ Callback audition (18⚡)' : '🎟️ Audition (18⚡)',
+    () => act(audition(S, r.id)), S.energy < 18));
+  row.appendChild(actionBtn(r.negotiated ? '🤝 Negotiated' : '🤝 Negotiate',
+    () => act(negotiate(S, r.id)), !!r.negotiated));
+  c.appendChild(row);
   return c;
 }
 
@@ -388,6 +392,26 @@ function goalCard(m, complete) {
 // ---- People view (co-stars & relationships) --------------------------------
 function peopleView() {
   const wrap = el('div', 'view');
+
+  // Rivals
+  if (S.rivals && S.rivals.length) {
+    wrap.appendChild(el('h2', null, '😤 Rivals'));
+    wrap.appendChild(el('p', 'muted small', 'Peers who compete with you for roles and awards across your career. They keep working — and getting more famous — too.'));
+    const nemesis = [...S.rivals].sort((a, b) => b.rivalry - a.rivalry)[0];
+    const grid = el('div', 'grid');
+    for (const r of [...S.rivals].sort((a, b) => b.fame - a.fame)) {
+      const lead = r.fame > S.fame;
+      const card = el('div', 'card');
+      card.innerHTML = `<div class="card-head"><span class="card-ic">${r === nemesis && r.rivalry > 40 ? '🔥' : '🎭'}</span>
+        <div><div class="card-title">${r.name}${r === nemesis && r.rivalry > 40 ? ' <span class="muted small">· nemesis</span>' : ''}</div>
+        <div class="muted small">⭐ Fame ${r.fame} ${lead ? '(ahead of you)' : '(behind you)'} · Skill ${r.skill}</div></div></div>
+        <div class="bar"><div class="bar-fill" style="width:${r.rivalry}%"></div></div>
+        <div class="reqs small"><span class="${r.rivalry >= 60 ? 'bad' : r.rivalry >= 30 ? 'mid' : 'muted'}">Rivalry ${Math.round(r.rivalry)}/100</span></div>`;
+      grid.appendChild(card);
+    }
+    wrap.appendChild(grid);
+  }
+
   wrap.appendChild(el('h2', null, '👥 Relationships'));
   wrap.appendChild(el('p', 'muted small', 'Co-stars you work with become contacts. Close, famous friends boost your audition odds, and on-set chemistry can turn romantic. Catch up to keep bonds strong.'));
 
@@ -581,15 +605,27 @@ function gameOverView() {
 }
 
 // ---- Awards-night summary modal --------------------------------------------
-function renderCeremonyModal() {
+// Show at most one modal: awards night takes priority over a pending dilemma.
+function renderModals() {
   const existing = document.querySelector('#modal');
   if (existing) existing.remove();
-  const night = S.ceremonyNight;
-  if (!night || S.gameOver) return;
+  if (S.gameOver) return;
+  if (S.ceremonyNight) buildCeremonyModal();
+  else if (S.pendingChoice) buildChoiceModal();
+}
 
+function modalShell() {
   const overlay = el('div', 'modal-overlay');
   overlay.id = 'modal';
   const card = el('div', 'modal-card');
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+  return { overlay, card };
+}
+
+function buildCeremonyModal() {
+  const night = S.ceremonyNight;
+  const { overlay, card } = modalShell();
   const won = night.wins > 0;
   card.appendChild(el('div', 'modal-ic', night.icon));
   card.appendChild(el('h2', null, `${night.name}`));
@@ -600,8 +636,9 @@ function renderCeremonyModal() {
     const react = (r.reactions && r.reactions.length)
       ? `<div class="muted small">${r.won ? '🤝 Celebrating with' : '👏 Supported by'} ${r.reactions.slice(0, 3).join(', ')}</div>`
       : '';
+    const lost = (!r.won && r.beatenBy) ? `<div class="muted small">Lost to ${r.beatenBy}</div>` : '';
     ul.appendChild(el('li', r.won ? 'award-win' : '',
-      `${r.won ? '🥇 WON' : '🎗️ Nominated'} — <b>${r.category}</b> <span class="muted">(${r.project})</span>${react}`));
+      `${r.won ? '🥇 WON' : '🎗️ Nominated'} — <b>${r.category}</b> <span class="muted">(${r.project})</span>${lost}${react}`));
   }
   card.appendChild(ul);
   card.appendChild(el('p', won ? 'modal-headline good' : 'modal-headline',
@@ -615,8 +652,37 @@ function renderCeremonyModal() {
   });
   btn.classList.add('primary');
   card.appendChild(btn);
-  overlay.appendChild(card);
-  document.body.appendChild(overlay);
+}
+
+function buildChoiceModal() {
+  const ch = S.pendingChoice;
+  const { overlay, card } = modalShell();
+  card.appendChild(el('div', 'modal-ic', '🎬'));
+  card.appendChild(el('h2', null, ch.title));
+  card.appendChild(el('p', 'modal-text', ch.text));
+
+  const opts = el('div', 'choice-opts');
+  ch.options.forEach((o, i) => {
+    const b = el('button', 'btn choice-btn', o.label);
+    b.onclick = () => {
+      const res = resolveChoice(S, i);
+      overlay.remove();
+      // Show the outcome, then continue.
+      const o2 = modalShell();
+      o2.card.appendChild(el('div', 'modal-ic', '🎬'));
+      o2.card.appendChild(el('h2', null, ch.title));
+      o2.card.appendChild(el('p', 'modal-text', res.msg || 'Done.'));
+      const cont = actionBtn('Continue', () => {
+        o2.overlay.remove();
+        if (onMutate) onMutate(S);
+        render();
+      });
+      cont.classList.add('primary');
+      o2.card.appendChild(cont);
+    };
+    opts.appendChild(b);
+  });
+  card.appendChild(opts);
 }
 
 // ---- Log -------------------------------------------------------------------
@@ -646,5 +712,5 @@ export function render() {
   const adv = $('#advance');
   adv.disabled = S.gameOver;
   adv.onclick = () => { advanceWeek(S); act({ ok: true }); };
-  renderCeremonyModal();
+  renderModals();
 }

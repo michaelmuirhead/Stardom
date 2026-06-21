@@ -2,8 +2,8 @@
 import {
   WEEKS_PER_YEAR, AGENT_CUT, CLASSES, EVENTS,
   DIFFICULTIES, GENRES, GENRE_KEYS, CEREMONIES, creditMedium,
-  HALL_OF_FAME, LIFETIME_ACHIEVEMENT_MIN, MILESTONES,
-  projectTitle, makeRole, makeCostar,
+  HALL_OF_FAME, LIFETIME_ACHIEVEMENT_MIN, MILESTONES, CHOICE_EVENTS,
+  projectTitle, makeRole, makeCostar, makeRival,
 } from './data.js';
 import { pushLog, refreshOffers } from './state.js';
 
@@ -91,6 +91,8 @@ export function auditionChance(s, role) {
   if (tc.genre && role.genre !== tc.genre) chance -= tc.degree * 0.15;
   // A callback means they already liked you — better shot the second time.
   if (role.callback) chance += 0.18;
+  // You soured this room during a botched negotiation.
+  if (role.hagglePenalty) chance -= role.hagglePenalty;
   return clamp(chance, 0.03, 0.97);
 }
 
@@ -136,10 +138,103 @@ export function audition(s, roleId) {
     return { ok: true, won: false, callback: true, msg: `Callback for "${role.title}"!` };
   }
 
-  // Otherwise you've used your shot.
+  // Otherwise you've used your shot. Sometimes a rival snags the part.
   s.offers = s.offers.filter((r) => r.id !== roleId);
+  const rival = Math.random() < 0.4 ? pickRival(s) : null;
+  if (rival) {
+    rival.rivalry = clamp(rival.rivalry + rf(2, 6), 0, 100);
+    rival.fame = Math.round(clamp(rival.fame + rf(0.3, 1), 1, 100));
+    pushLog(s, `❌ You lost "${role.title}" — your rival ${rival.name} landed it instead. (+${learn} acting)`);
+    return { ok: true, won: false, msg: `${rival.name} got the part on "${role.title}".` };
+  }
   pushLog(s, `❌ You auditioned for "${role.title}" but didn't get it. (${Math.round(chance * 100)}% odds, +${learn} acting)`);
   return { ok: true, won: false, msg: `No luck on "${role.title}".` };
+}
+
+// ---- Negotiation -----------------------------------------------------------
+// Haggle an offer's deal before you audition. Fame, reputation and (especially)
+// an agent drive your success; pushing too hard can cool the room or kill the
+// offer. One attempt per role.
+export function negotiate(s, roleId) {
+  if (s.gameOver) return { ok: false, msg: 'The game is over.' };
+  const role = s.offers.find((r) => r.id === roleId);
+  if (!role) return { ok: false, msg: 'That offer is gone.' };
+  if (role.negotiated) return { ok: false, msg: 'You\'ve already negotiated this deal.' };
+
+  const chance = clamp(0.32 + s.reputation / 200 + s.fame / 220 + (s.hasAgent ? 0.25 : 0), 0.1, 0.92);
+  if (Math.random() < chance) {
+    const factor = rf(1.12, 1.4);
+    role.pay = Math.round(role.pay * factor);
+    role.negotiated = 'up';
+    if (s.hasAgent) role.fameGain = +(role.fameGain * 1.1).toFixed(1); // better billing
+    pushLog(s, `🤝 You negotiated a better deal on "${role.title}" — pay up ${Math.round((factor - 1) * 100)}%.`);
+    return { ok: true, msg: 'Deal sweetened!' };
+  }
+  // Failure: you came off as difficult.
+  role.negotiated = 'down';
+  s.reputation = clamp(s.reputation - rf(1, 3), 0, 100);
+  if (Math.random() < 0.18) {
+    s.offers = s.offers.filter((r) => r.id !== roleId);
+    pushLog(s, `🚪 You overplayed your hand — the producers walked away from "${role.title}".`);
+    return { ok: false, msg: 'They pulled the offer.' };
+  }
+  role.hagglePenalty = 0.08; // casting cooled on you
+  pushLog(s, `😬 Negotiations on "${role.title}" soured. Casting cooled on you.`);
+  return { ok: false, msg: 'That went badly.' };
+}
+
+// ---- Rivals ----------------------------------------------------------------
+function pickRival(s) {
+  if (!s.rivals || !s.rivals.length) return null;
+  return s.rivals[Math.floor(Math.random() * s.rivals.length)];
+}
+
+// Rivals' careers advance each year; a new challenger can emerge as you rise.
+function updateRivals(s) {
+  if (!s.rivals) s.rivals = [];
+  for (const r of s.rivals) {
+    r.fame = Math.round(clamp(r.fame + rf(0.5, 3) + (r.skill > 60 ? 1 : 0), 1, 100));
+    r.skill = Math.round(clamp(r.skill + rf(0, 1.2), 1, 100));
+    r.rivalry = clamp(r.rivalry - 1, 0, 100); // rivalries cool if not provoked
+  }
+  if (s.fame > 50 && s.rivals.length < 3) {
+    const nemesis = makeRival(s.fame);
+    s.rivals.push(nemesis);
+    pushLog(s, `🔥 A new rival has emerged: ${nemesis.name} is making waves.`);
+  }
+}
+
+// ---- Narrative dilemmas ----------------------------------------------------
+function maybeTriggerChoice(s) {
+  if (s.pendingChoice || s.ceremonyNight || s.gameOver) return;
+  if (Math.random() >= 0.06) return; // ~6%/week
+  const eligible = CHOICE_EVENTS.filter((e) => !e.when || e.when(s));
+  if (!eligible.length) return;
+  const e = eligible[Math.floor(Math.random() * eligible.length)];
+  s.pendingChoice = {
+    id: e.id, title: e.title, text: e.text,
+    options: e.options.map((o) => ({ label: o.label })),
+  };
+}
+
+export function resolveChoice(s, idx) {
+  if (!s.pendingChoice) return { ok: false, msg: 'No decision pending.' };
+  const e = CHOICE_EVENTS.find((x) => x.id === s.pendingChoice.id);
+  s.pendingChoice = null;
+  if (!e || !e.options[idx]) return { ok: false, msg: 'That choice is unavailable.' };
+  const d = e.options[idx].outcome(s) || {};
+  if (d.money) s.money += Math.round(d.money);
+  if (d.fame) gainFame(s, d.fame);
+  if (d.rep) s.reputation = clamp(s.reputation + d.rep, 0, 100);
+  if (d.acting) s.acting = clamp(+(s.acting + d.acting).toFixed(1), 0, 100);
+  if (d.energy) s.energy = clamp(s.energy + d.energy, 0, s.maxEnergy);
+  if (d.rivalry) for (const r of (s.rivals || [])) r.rivalry = clamp(r.rivalry + d.rivalry, 0, 100);
+  if (d.partnerRel && s.partner) {
+    const p = s.contacts.find((c) => c.id === s.partner);
+    if (p) p.rel = clamp(p.rel + d.partnerRel, 0, 100);
+  }
+  if (d.msg) pushLog(s, `🎬 ${d.msg}`);
+  return { ok: true, msg: d.msg || 'Decision made.' };
 }
 
 // ---- Co-stars & relationships ---------------------------------------------
@@ -671,18 +766,28 @@ function runCeremony(s, cer) {
       category: cat.name, project: mine.title, year: s.year, won: res.won,
     });
     const reactions = costarReactions(s, mine, res.won);
-    results.push({ category: cat.name, project: mine.title, won: res.won, reactions });
+    const rival = pickRival(s);
+    let beatenBy = null;
     if (res.won) {
       s.stats.wins = (s.stats.wins || 0) + 1;
       gainFame(s, 4 * cer.prestige);
       s.reputation = clamp(s.reputation + 6 * cer.prestige, 0, 100);
+      // A rival you beat is none too pleased.
+      if (rival) rival.rivalry = clamp(rival.rivalry + rf(2, 5), 0, 100);
       pushLog(s, `🥇 WON ${cat.name} at the ${cer.name} for "${mine.title}"!`);
     } else {
       s.stats.noms = (s.stats.noms || 0) + 1;
       gainFame(s, 1.5 * cer.prestige);
       s.reputation = clamp(s.reputation + 2 * cer.prestige, 0, 100);
-      pushLog(s, `🎗️ Nominated for ${cat.name} at the ${cer.name} ("${mine.title}").`);
+      // Often a rival is the one who beats you — fuel for the rivalry.
+      if (rival && Math.random() < 0.6) {
+        rival.rivalry = clamp(rival.rivalry + rf(3, 7), 0, 100);
+        rival.fame = Math.round(clamp(rival.fame + rf(0.5, 2), 1, 100));
+        beatenBy = rival.name;
+      }
+      pushLog(s, `🎗️ Nominated for ${cat.name} at the ${cer.name} ("${mine.title}")${beatenBy ? ` — lost to ${beatenBy}` : ''}.`);
     }
+    results.push({ category: cat.name, project: mine.title, won: res.won, reactions, beatenBy });
   }
   // Surface an awards-night summary to the UI when you were in the running.
   if (results.length) {
@@ -821,6 +926,7 @@ export function advanceWeek(s) {
     s.week = 1;
     s.year++;
     s.age++;
+    updateRivals(s);
     pushLog(s, `📅 A new year begins. You are now ${s.age}.`);
   }
 
@@ -831,6 +937,9 @@ export function advanceWeek(s) {
 
   // Career milestones (passive completions: fame/money thresholds, awards, etc.)
   checkMilestones(s);
+
+  // A narrative dilemma may surface this week.
+  maybeTriggerChoice(s);
 
   // Lose condition: deep, sustained debt
   if (s.money < D.debtFloor) {

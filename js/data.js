@@ -168,6 +168,18 @@ export function makeCostar(playerFame) {
 
 function clampNum(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
+// A named career-long rival: a peer who competes for your roles and awards.
+export function makeRival(playerFame) {
+  const fame = Math.round(clampNum(playerFame + rf(3, 18), 2, 100));
+  return {
+    id: 'rv' + Math.random().toString(36).slice(2, 9),
+    name: fullName(),
+    fame,
+    skill: Math.round(clampNum(fame * rf(0.7, 1.1) + 8, 5, 100)),
+    rivalry: Math.round(rf(10, 30)),  // 0..100 intensity
+  };
+}
+
 // ---- Classes / training ----------------------------------------------------
 export const CLASSES = [
   { key: 'acting', stat: 'acting', name: 'Acting Workshop', icon: '🎭', cost: 350, energy: 25, gain: [1.5, 3], cap: 100, desc: 'Sharpen your core craft.' },
@@ -206,6 +218,86 @@ export const EVENTS = [
   {
     id: 'flop', chance: 0.03, when: (s) => s.fame > 50,
     run: (s) => ({ msg: '💸 An old project underperformed in re-runs. -Fame.', delta: { fame: -(1 + Math.random() * 3) } }),
+  },
+];
+
+// ---- Narrative dilemmas (choice events) ------------------------------------
+// Each option's `outcome(s)` returns a delta + message; the engine applies it
+// (so logic stays here and only serializable display data is stored in state).
+// Supported delta keys: money, fame, rep, acting, energy, rivalry, partnerRel.
+export const CHOICE_EVENTS = [
+  {
+    id: 'tabloid', when: (s) => s.fame > 18,
+    title: '📰 A Tabloid Comes Knocking',
+    text: 'A gossip magazine offers $8,000 for a tell-all about a co-star\'s on-set behavior.',
+    options: [
+      { label: 'Take the money', outcome: () => ({ money: 8000, rep: -8, partnerRel: -10, msg: 'You cash in — but the industry frowns, and it stings close to home.' }) },
+      { label: 'Politely decline', outcome: () => ({ rep: 4, msg: 'You keep your mouth shut. Colleagues note your discretion.' }) },
+    ],
+  },
+  {
+    id: 'method',
+    title: '🎭 Going Method',
+    text: 'A demanding director wants you to stay in character for the entire shoot.',
+    options: [
+      { label: 'Fully commit', outcome: () => ({ acting: rf(2, 4), energy: -25, rep: 2, msg: 'Grueling — but your craft sharpens and critics take note.' }) },
+      { label: 'Keep it professional', outcome: () => ({ msg: 'You deliver a solid, sane performance. No harm done.' }) },
+    ],
+  },
+  {
+    id: 'feud', when: (s) => (s.rivals || []).some((r) => r.rivalry > 40),
+    title: '😤 A Public Jab',
+    text: 'A rival took a swipe at you in an interview. The press wants your response.',
+    options: [
+      { label: 'Clap back', outcome: () => ({ fame: rf(2, 5), rivalry: 15, rep: -3, msg: 'The feud makes headlines. Fame up, but it turns ugly.' }) },
+      { label: 'Take the high road', outcome: () => ({ rep: 5, rivalry: -5, msg: 'You stay gracious. The industry respects it.' }) },
+    ],
+  },
+  {
+    id: 'viral_temper', when: (s) => s.fame > 35,
+    title: '📹 Caught on Camera',
+    text: 'A clip of you losing your temper on set is going viral.',
+    options: [
+      { label: 'Issue a sincere apology', outcome: () => ({ fame: -2, rep: 4, msg: 'You own it. Fans forgive; your reputation recovers.' }) },
+      { label: 'Double down', outcome: () => ({ fame: rf(2, 6), rep: -7, msg: 'You lean into the chaos. More famous, less respected.' }) },
+    ],
+  },
+  {
+    id: 'gala', when: (s) => s.money > 20000,
+    title: '🎗️ Charity Gala',
+    text: 'A high-profile charity asks you to headline their fundraiser — and donate.',
+    options: [
+      { label: 'Donate generously ($15k)', outcome: () => ({ money: -15000, rep: 8, fame: 2, msg: 'Your generosity earns goodwill across the industry.' }) },
+      { label: 'Attend, don\'t donate', outcome: () => ({ fame: 1, msg: 'You show your face. Nice photos, modest buzz.' }) },
+      { label: 'Skip it', outcome: () => ({ rep: -2, msg: 'You stay home. A few eyebrows raise.' }) },
+    ],
+  },
+  {
+    id: 'passion',
+    title: '🎬 Passion vs. Paycheck',
+    text: 'Two scripts land on your desk: a soulless blockbuster cameo and a tiny, brilliant indie.',
+    options: [
+      { label: 'Chase the paycheck', outcome: () => ({ money: 30000, rep: -3, msg: 'Easy money. The art crowd sighs.' }) },
+      { label: 'Follow your heart', outcome: () => ({ rep: 6, acting: rf(1, 3), msg: 'The indie pays nothing but feeds your craft and credibility.' }) },
+    ],
+  },
+  {
+    id: 'mentor', when: (s) => s.fame > 50,
+    title: '🌱 A Rising Hopeful',
+    text: 'A nervous newcomer asks you to mentor them.',
+    options: [
+      { label: 'Take them under your wing', outcome: () => ({ energy: -15, rep: 5, msg: 'You pay it forward. The community admires you.' }) },
+      { label: 'You\'re too busy', outcome: () => ({ msg: 'You politely decline. No one blames you... much.' }) },
+    ],
+  },
+  {
+    id: 'campaign', when: (s) => s.fame > 40 && s.money > 25000,
+    title: '📣 Awards Campaign',
+    text: 'Your team pitches an expensive "For Your Consideration" campaign this season.',
+    options: [
+      { label: 'Fund the campaign ($20k)', outcome: () => ({ money: -20000, rep: 3, fame: 4, msg: 'The billboards go up. Voters are paying attention.' }) },
+      { label: 'Let the work speak', outcome: () => ({ msg: 'You trust the performance to stand on its own.' }) },
+    ],
   },
 ];
 

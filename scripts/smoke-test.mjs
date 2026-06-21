@@ -6,7 +6,7 @@ import { DIFFICULTIES, GENRE_KEYS } from '../js/data.js';
 import {
   advanceWeek, audition, auditionChance, takeClass, network, rest, sideJob,
   extraWork, toggleAgent, writeScript, startProduction, isBusy, catchUp, quitSeries,
-  agentReady,
+  agentReady, negotiate, resolveChoice,
 } from '../js/engine.js';
 
 let failures = 0;
@@ -180,6 +180,40 @@ console.log(`  awards (${YEARS}yr legend): ${aw.wins} wins, ${aw.noms} nominatio
 assert(aw.wins + aw.noms > 0, 'awards season produced nominations/wins over a long career');
 assert(aw.wins < YEARS, `award wins are realistic, not runaway (${aw.wins} over ${YEARS}yr)`);
 assert(aw.milestones >= 6, `career milestones are completed over a long career (${aw.milestones})`);
+
+// 6) Rivals, negotiation, and narrative choices
+{
+  const fresh = newGame('Feature Bot', 'normal');
+  assert((fresh.rivals || []).length >= 2, 'rivals are created at game start');
+
+  // Negotiation: an established, agented actor should usually succeed and raise pay.
+  let negSuccess = 0;
+  for (let i = 0; i < 50; i++) {
+    const s = newGame('Haggler', 'normal');
+    s.fame = 45; s.reputation = 55; s.hasAgent = true;
+    const r = s.offers[0]; const oldPay = r.pay;
+    const res = negotiate(s, r.id);
+    if (res.ok && r.pay > oldPay) negSuccess++;
+  }
+  assert(negSuccess > 25, `negotiation raises pay on success (${negSuccess}/50)`);
+
+  // Narrative choice: trigger one and resolve it cleanly.
+  const cs = newGame('Decider', 'normal');
+  cs.fame = 45; cs.money = 40000; cs.reputation = 50;
+  let guard = 0;
+  while (!cs.pendingChoice && guard++ < 400) { cs.money = 40000; advanceWeek(cs); }
+  assert(!!cs.pendingChoice, 'a narrative dilemma can be triggered');
+  if (cs.pendingChoice) {
+    const r = resolveChoice(cs, 0);
+    assert(r.ok && !cs.pendingChoice, 'a narrative dilemma resolves and clears');
+  }
+
+  // Rivals advance over the years.
+  const rs = newGame('Survivor', 'normal');
+  const startTopFame = Math.max(...rs.rivals.map((r) => r.fame));
+  for (let i = 0; i < 6 * 52; i++) { rs.money = 1e9; advanceWeek(rs); }
+  assert(Math.max(...rs.rivals.map((r) => r.fame)) > startTopFame, 'rivals gain fame over a career');
+}
 
 console.log('');
 if (failures) {

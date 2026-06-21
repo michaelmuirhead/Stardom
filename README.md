@@ -62,6 +62,17 @@ series-regular TV roles that open calls never offer (the agent takes a 12% cut i
 return). Reaching it is a genuine climb of roughly a year of scraping by; fame
 comes slowly while you're an unknown and compounds once you're recognized.
 
+**Negotiating deals.** Before you audition, you can **🤝 negotiate** an offer's
+terms. Your fame, reputation and (especially) your agent drive the odds — succeed
+and your pay jumps (with an agent, your billing improves too); push too hard and
+you'll sour the room or watch the producers walk away. Risk versus reward.
+
+**Rivals.** A handful of named peers shadow your whole career, competing for the
+same roles and awards. They snipe parts out from under you, beat you (or lose to
+you) on awards night, and keep getting more famous over the years — and a fresh
+challenger emerges once you hit the big time. Rivalries heat up with every clash;
+track them on the **People** tab.
+
 **Genre specialization & typecasting.** Every role has a genre (🎭 Drama, 😂 Comedy,
 💥 Action, 👻 Horror, 🚀 Sci-Fi, 💖 Romance). The more you work in a genre, the
 better your audition odds for similar roles — and the more your top genre becomes
@@ -73,6 +84,11 @@ across genres keeps your range — a real strategic tension.
 **Career goals.** A **🎯 Goals** tab tracks ~15 milestones that chart your rise
 from first day on set to Academy Award winner and millionaire, each granting a
 small reward and giving you direction at every stage.
+
+**Narrative dilemmas.** Now and then a situation lands on your desk — a tabloid
+buyout, a method-acting demand, a viral controversy, a passion project versus a
+fat paycheck — and you choose how to handle it. Each choice has real consequences
+for your money, fame, reputation, craft, and relationships.
 
 **Co-stars & relationships.** Land a role and you meet co-stars, who become
 lasting contacts. A close, famous ally boosts your audition odds; a famous
