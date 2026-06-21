@@ -76,6 +76,12 @@ Hit. Hits boost your fame and reputation; flops set you back. Great work also ma
 the credit a real awards contender. Long shoots also throw the occasional **on-set
 dilemma** (an extra take, your own stunt, an improv idea, friction with a co-star).
 
+**Release results.** When a project comes out, a **premiere screen** shows the
+actual results — **box office** for theatrical films, **viewership** for TV and
+streaming, plus the rating, your performance score, fame gained, and (for your own
+productions) the profit. Every credit in your filmography records its box
+office/viewership and reception, so your career history reads like a real résumé.
+
 **Starting out (the grind).** Without representation you only see **Open Calls** —
 smaller, lower-paid commercials, TV movies, and indie films. Every audition
 teaches you something — you gain a little acting craft win *or* lose. A near-miss

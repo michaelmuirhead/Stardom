@@ -235,7 +235,7 @@ function updateRivals(s) {
 
 // ---- Narrative dilemmas ----------------------------------------------------
 function maybeTriggerChoice(s) {
-  if (s.pendingChoice || s.ceremonyNight || s.gameOver) return;
+  if (s.pendingChoice || s.ceremonyNight || s.releaseNight || s.gameOver) return;
   if (Math.random() >= 0.06) return; // ~6%/week
   const eligible = CHOICE_EVENTS.filter((e) => !e.when || e.when(s));
   if (!eligible.length) return;
@@ -378,6 +378,10 @@ function endSeason(s) {
     5, 100,
   ));
   const renewChance = clamp(sh.ratings / 110 + diffOf(s).oddsBonus, 0.08, 0.93);
+  const rec = reception(sh.ratings);
+  // Viewership (millions) scales with the rating.
+  const viewers = +(3 + sh.ratings / 100 * 18 * rf(0.8, 1.3)).toFixed(1);
+  const seasonNo = sh.season;
 
   if (Math.random() < renewChance) {
     sh.season++;
@@ -388,6 +392,12 @@ function endSeason(s) {
     sh.status = 'filming';
     s.stats.seasons++;
     pushLog(s, `📈 "${sh.title}" was RENEWED for season ${sh.season}! (${sh.ratings} rating, +12% pay). +${fg} fame.`);
+    s.releaseNight = {
+      title: sh.title, icon: '📡', category: `TV Series · Season ${seasonNo}`,
+      role: sh.part, genre: sh.genreName, quality: sh.ratings, reception: rec.label, emoji: rec.emoji,
+      result: { type: 'views', value: viewers }, rating: sh.ratings, verdict: `Renewed for Season ${sh.season}`,
+      fameGain: fg, costars: (sh.costars || []).map((c) => c.name),
+    };
   } else {
     // Cancellation: a long run earns a prestigious finale.
     const finale = +(sh.prestige * Math.min(sh.season, 6) * 0.6).toFixed(2);
@@ -397,9 +407,15 @@ function endSeason(s) {
       title: `${sh.title} (${sh.season} season${sh.season > 1 ? 's' : ''})`,
       category: 'TV Series', role: sh.part, genre: sh.genreName,
       acted: true, billing: 'lead', lead: true, costars: (sh.costars || []).map((c) => c.id),
-      quality: sh.ratings,
+      quality: sh.ratings, reception: rec.label, result: { type: 'views', value: viewers },
     });
     pushLog(s, `📉 "${sh.title}" was CANCELLED after ${sh.season} season(s) (${sh.ratings} rating). A ${sh.season >= 3 ? 'beloved' : 'brief'} run wraps. +${fg} fame.`);
+    s.releaseNight = {
+      title: sh.title, icon: '📡', category: `TV Series · ${seasonNo} season${seasonNo > 1 ? 's' : ''}`,
+      role: sh.part, genre: sh.genreName, quality: sh.ratings, reception: rec.label, emoji: rec.emoji,
+      result: { type: 'views', value: viewers }, rating: sh.ratings, verdict: 'Cancelled — the show wraps',
+      fameGain: fg, costars: (sh.costars || []).map((c) => c.name),
+    };
     s.activeSeries = null;
   }
 }
@@ -675,6 +691,23 @@ function reception(quality) {
   return { label: 'Smash Hit', fameMult: 1.6, rep: 3, emoji: '🌟' };
 }
 
+// Concrete commercial result of a release: theatrical box office (USD) or
+// streaming/TV viewership (millions), scaled by the project, its quality, and
+// the player's drawing power.
+function projectResult(category, tier, quality, fame) {
+  const lk = rf(0.75, 1.35);
+  const tierMult = [0.6, 1.0, 1.8][tier] ?? 1;
+  const draw = (0.6 + fame / 100 * 0.8);
+  if (category === 'Indie Film' || category === 'Studio Film') {
+    const base = category === 'Indie Film' ? 1.6e6 : 42e6;
+    return { type: 'box', value: Math.round(base * tierMult * (0.4 + quality / 100 * 2.2) * draw * lk) };
+  }
+  const baseV = category === 'Streaming Film' ? 22
+    : category === 'Streaming Series' ? 14
+      : category === 'TV Movie' ? 4 : 8;
+  return { type: 'views', value: +(baseV * tierMult * (0.4 + quality / 100 * 1.8) * draw * lk).toFixed(1) };
+}
+
 // Rehearse for the project you're currently filming to lift its performance.
 export function prepareRole(s) {
   if (s.gameOver) return { ok: false, msg: 'The game is over.' };
@@ -717,6 +750,7 @@ function wrapProduction(s, prod) {
     bondWithCostars(s, prod.costars || []);
   }
 
+  const rec = reception(q);
   addCredit(s, {
     title: prod.title, category: 'Produced', genre: prod.genreName,
     role: [prod.star ? 'Star' : null, prod.directed ? 'Director' : null, 'Producer', prod.written ? 'Writer' : null].filter(Boolean).join(' / '),
@@ -724,13 +758,20 @@ function wrapProduction(s, prod) {
     acted: !!prod.star, billing: prod.star ? 'lead' : undefined, lead: !!prod.star,
     costars: (prod.costars || []).map((c) => c.id),
     writeQuality: prod.scriptQuality, quality: Math.round(q),
-    reception: reception(q).label,
+    reception: rec.label, result: { type: 'box', value: gross },
   });
 
   const verdict = profit > 0
     ? `It grossed $${gross.toLocaleString()} — a $${profit.toLocaleString()} profit! 🍾`
     : `It grossed $${gross.toLocaleString()} — a $${Math.abs(profit).toLocaleString()} loss. 📉`;
-  pushLog(s, `🎞️ "${prod.title}" wrapped (${reception(q).emoji} ${reception(q).label}, quality ${Math.round(q)}). ${verdict} +${fameGain} fame.`);
+  pushLog(s, `🎞️ "${prod.title}" wrapped (${rec.emoji} ${rec.label}, quality ${Math.round(q)}). ${verdict} +${fameGain} fame.`);
+  s.releaseNight = {
+    title: prod.title, icon: prod.genreIcon || '🎬', category: 'Your Production',
+    role: [prod.star ? 'Star' : null, prod.directed ? 'Director' : null, 'Producer'].filter(Boolean).join(' / '),
+    genre: prod.genreName, quality: Math.round(q), reception: rec.label, emoji: rec.emoji,
+    result: { type: 'box', value: gross }, profit, fameGain,
+    costars: (prod.costars || []).map((c) => c.name),
+  };
 }
 
 // ---- Random events ---------------------------------------------------------
@@ -978,9 +1019,19 @@ export function advanceWeek(s) {
         lead: a.role.billing === 'lead',
         costars: (a.costars || []).map((c) => c.id),
         quality, reception: rec ? rec.label : undefined,
+        result: isAd ? null : projectResult(a.role.catName, a.role.tier, quality, s.fame),
       });
+      const cred = s.filmography[s.filmography.length - 1];
       const recMsg = rec ? ` ${rec.emoji} ${rec.label} (quality ${quality}).` : '';
       pushLog(s, `🎉 "${a.role.title}" wrapped!${recMsg} +${fameGain} fame, +${a.role.skillGain} acting.`);
+      if (!isAd) {
+        s.releaseNight = {
+          title: a.role.title, icon: a.role.genreIcon, category: a.role.catName,
+          role: a.role.part, billing: a.role.billing, genre: a.role.genreName,
+          quality, reception: rec.label, emoji: rec.emoji, result: cred.result,
+          fameGain, costars: (a.costars || []).map((c) => c.name),
+        };
+      }
       s.active = null;
     }
   }

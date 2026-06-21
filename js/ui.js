@@ -21,6 +21,16 @@ const el = (tag, cls, html) => {
   return e;
 };
 const money = (n) => (n < 0 ? '-$' + Math.abs(n).toLocaleString() : '$' + n.toLocaleString());
+// Compact money for big release figures: $1.2M, $340K, $2.1B.
+const bigMoney = (n) => {
+  const a = Math.abs(n);
+  if (a >= 1e9) return '$' + (n / 1e9).toFixed(1) + 'B';
+  if (a >= 1e6) return '$' + (n / 1e6).toFixed(1) + 'M';
+  if (a >= 1e3) return '$' + Math.round(n / 1e3) + 'K';
+  return '$' + Math.round(n);
+};
+// Human text for a release result (box office or viewership).
+const resultText = (r) => (!r ? '' : r.type === 'box' ? `${bigMoney(r.value)} box office` : `${r.value}M viewers`);
 
 export function bindUI(state, mutateCb) {
   S = state;
@@ -617,7 +627,8 @@ function careerView() {
     const ul = el('ul', 'list');
     for (const f of [...S.filmography].reverse()) {
       const rec = f.reception ? ` <span class="muted small">· ${f.reception}</span>` : '';
-      ul.appendChild(el('li', null, `<b>${f.title}</b> — ${f.role} <span class="muted">(${f.genre ? f.genre + ' ' : ''}${f.category}, Yr ${f.year})</span>${f.quality != null ? ` <span class="qchip">★ ${f.quality}</span>` : ''}${rec}`));
+      const res = f.result ? ` <span class="muted small">· ${resultText(f.result)}</span>` : '';
+      ul.appendChild(el('li', null, `<b>${f.title}</b> — ${f.role} <span class="muted">(${f.genre ? f.genre + ' ' : ''}${f.category}, Yr ${f.year})</span>${f.quality != null ? ` <span class="qchip">★ ${f.quality}</span>` : ''}${rec}${res}`));
     }
     wrap.appendChild(ul);
   }
@@ -721,8 +732,43 @@ function renderModals() {
   const existing = document.querySelector('#modal');
   if (existing) existing.remove();
   if (S.gameOver) return;
-  if (S.ceremonyNight) buildCeremonyModal();
+  if (S.releaseNight) buildReleaseModal();
+  else if (S.ceremonyNight) buildCeremonyModal();
   else if (S.pendingChoice) buildChoiceModal();
+}
+
+function buildReleaseModal() {
+  const r = S.releaseNight;
+  const { overlay, card } = modalShell();
+  card.appendChild(el('div', 'modal-ic', r.emoji || r.icon || '🎬'));
+  card.appendChild(el('h2', null, `"${r.title}"`));
+  card.appendChild(el('p', 'muted', `${r.icon ? r.icon + ' ' : ''}${r.category}${r.role ? ' · ' + r.role : ''}`));
+
+  const rows = el('div', 'estimate');
+  const row = (lab, val, cls) => `<div class="est-row ${cls || ''}"><span>${lab}</span><span>${val}</span></div>`;
+  let html = '';
+  if (r.result) html += row(r.result.type === 'box' ? 'Box office' : 'Viewership', resultText(r.result));
+  if (r.rating != null) html += row('Rating', `${r.rating}/100`);
+  if (r.quality != null) html += row('Your performance', `${r.quality}/100`);
+  if (r.profit != null) html += row('Profit', `${r.profit >= 0 ? '+' : ''}${money(r.profit)}`, r.profit >= 0 ? 'good' : 'bad');
+  if (r.fameGain != null) html += row('Fame gained', `+${r.fameGain}`);
+  rows.innerHTML = html;
+  card.appendChild(rows);
+
+  card.appendChild(el('p', `modal-headline ${/Hit|Smash/.test(r.reception) ? 'good' : ''}`,
+    `${r.emoji} ${r.reception}${r.verdict ? ' — ' + r.verdict : '!'}`));
+  if (r.costars && r.costars.length) {
+    card.appendChild(el('p', 'muted small', `Starring you, with ${r.costars.slice(0, 3).join(', ')}`));
+  }
+
+  const btn = actionBtn('Continue', () => {
+    S.releaseNight = null;
+    if (onMutate) onMutate(S);
+    overlay.remove();
+    render();
+  });
+  btn.classList.add('primary');
+  card.appendChild(btn);
 }
 
 function modalShell() {
