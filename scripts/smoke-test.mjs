@@ -300,6 +300,20 @@ assert(aw.milestones >= 6, `career milestones are completed over a long career (
     assert(bs.offers.length <= before, 'no new offers arrive while you are committed to a shoot');
   }
 
+  // Industry memory: a director who champions you eventually brings a personal offer.
+  {
+    const cs = newGame('Favored', 'easy');
+    cs.hasAgent = true; cs.agentTier = 'powerhouse'; cs.fame = 55; cs.acting = 70;
+    cs.directors = [{ id: 'dirfan', name: 'Ada Vance', rel: 92, films: 3 }];
+    let championed = false, guard = 0;
+    while (!championed && guard++ < 500) {
+      cs.money = 5e6;
+      advanceWeek(cs);
+      if (cs.offers.some((o) => o.from && o.from.kind === 'director')) championed = true;
+    }
+    assert(championed, 'a director who champions you brings a personal offer');
+  }
+
   // Rivals advance over the years.
   const rs = newGame('Survivor', 'normal');
   const startTopFame = Math.max(...rs.rivals.map((r) => r.fame));

@@ -273,6 +273,7 @@ function roleCard(r) {
   const chCls = chance >= 60 ? 'good' : chance >= 30 ? 'mid' : 'bad';
   const c = el('div', 'card' + (r.callback ? ' callback' : ''));
   c.innerHTML = `
+    ${r.from ? `<div class="badge champion">${r.from.kind === 'studio' ? '🏢' : '🎬'} Offered to you by ${r.from.name}</div>` : ''}
     ${r.sequel ? '<div class="badge sequel">🎬 Franchise sequel — they want you back</div>' : ''}
     ${r.callback ? '<div class="badge">📞 Callback — they liked you</div>' : ''}
     <div class="card-head"><span class="card-ic">${r.icon}</span>
@@ -650,10 +651,45 @@ function representationBlock() {
   return wrap;
 }
 
+// Directors & studios who remember you — the industry's standing on you.
+function industryBlock() {
+  const wrap = el('div');
+  const dirs = [...(S.directors || [])].filter((d) => d.films > 0 || d.rel !== 50).sort((a, b) => b.rel - a.rel);
+  const studios = [...(S.studios || [])].sort((a, b) => b.rel - a.rel);
+  if (!dirs.length && !studios.length) return wrap;
+  wrap.appendChild(el('h2', null, '🏛️ The Industry'));
+  wrap.appendChild(el('p', 'muted small', 'Directors and studios remember how you treated them and how your films performed. Champions bring you offers made just for you and tilt the room in your favor.'));
+  const grid = el('div', 'grid');
+  const dispo = (rel) => rel >= 80 ? ['🌟 champion', 'good'] : rel >= 65 ? ['😊 warm', 'good'] : rel >= 45 ? ['😐 neutral', 'mid'] : rel >= 25 ? ['😕 cool', 'bad'] : ['🙅 cold', 'bad'];
+  for (const d of dirs.slice(0, 8)) {
+    const [lab, cls] = dispo(d.rel);
+    const card = el('div', 'card');
+    card.innerHTML = `<div class="card-head"><span class="card-ic">🎬</span>
+      <div><div class="card-title">${d.name}</div>
+      <div class="muted small">Director · ${d.films} film${d.films === 1 ? '' : 's'} together</div></div></div>
+      <div class="bar"><div class="bar-fill" style="width:${d.rel}%"></div></div>
+      <div class="reqs small"><span class="${cls}">${lab} · ${d.rel}/100</span></div>`;
+    grid.appendChild(card);
+  }
+  for (const st of studios.slice(0, 6)) {
+    const [lab, cls] = dispo(st.rel);
+    const card = el('div', 'card');
+    card.innerHTML = `<div class="card-head"><span class="card-ic">🏢</span>
+      <div><div class="card-title">${st.name}</div>
+      <div class="muted small">Studio · ${st.films} film${st.films === 1 ? '' : 's'} for them</div></div></div>
+      <div class="bar"><div class="bar-fill" style="width:${st.rel}%"></div></div>
+      <div class="reqs small"><span class="${cls}">${lab} · ${st.rel}/100</span></div>`;
+    grid.appendChild(card);
+  }
+  wrap.appendChild(grid);
+  return wrap;
+}
+
 function peopleView() {
   const wrap = el('div', 'view');
 
   wrap.appendChild(representationBlock());
+  wrap.appendChild(industryBlock());
 
   // Rivals
   if (S.rivals && S.rivals.length) {

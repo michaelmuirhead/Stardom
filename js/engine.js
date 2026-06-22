@@ -167,6 +167,15 @@ export function auditionChance(s, role) {
   if (tc.genre && role.genre !== tc.genre) chance -= tc.degree * 0.15;
   // A callback means they already liked you — better shot the second time.
   if (role.callback) chance += 0.18;
+  // The industry remembers you: a director or studio who rates you tilts the room.
+  if (role.dirId) {
+    const d = (s.directors || []).find((x) => x.id === role.dirId);
+    if (d) chance += (d.rel - 50) / 170;          // ±~0.29 across the rel range
+  }
+  if (role.studioId) {
+    const st = (s.studios || []).find((x) => x.id === role.studioId);
+    if (st) chance += (st.rel - 50) / 220;
+  }
   // You soured this room during a botched negotiation.
   if (role.hagglePenalty) chance -= role.hagglePenalty;
   // Ageism: leading roles get harder past your mid-40s — fame softens the blow.
@@ -342,14 +351,80 @@ function bumpDirector(s, d, amt) {
   d.rel = clamp(Math.round(d.rel + amt), 0, 100);
 }
 
+// Studios remember how your films performed for them. Deliver a hit and they
+// trust you with the next one; flop and they cool off.
+function getOrCreateStudio(s) {
+  if (!s.studios) s.studios = [];
+  const known = s.studios;
+  const fans = known.filter((x) => x.rel >= 60);
+  if (fans.length && Math.random() < 0.5) return fans[Math.floor(Math.random() * fans.length)];
+  if (known.length && Math.random() < 0.4) return known[Math.floor(Math.random() * known.length)];
+  const unmet = STUDIOS.filter((name) => !known.some((x) => x.name === name));
+  const name = (unmet.length ? unmet : STUDIOS)[Math.floor(Math.random() * (unmet.length || STUDIOS.length))];
+  const st = { id: 'st' + Math.random().toString(36).slice(2, 7), name, rel: 50, films: 0 };
+  known.push(st);
+  return st;
+}
+
+function bumpStudio(s, st, amt) {
+  if (st) st.rel = clamp(Math.round(st.rel + amt), 0, 100);
+}
+
+// Studio-scale films build (or burn) a relationship with their studio.
+const STUDIO_SCALE = new Set(['movie', 'streamfilm']);
+function creditStudio(s, role, rec) {
+  if (!role || !STUDIO_SCALE.has(role.category)) return;
+  let st = role.studioId ? (s.studios || []).find((x) => x.id === role.studioId) : null;
+  if (!st) st = getOrCreateStudio(s);
+  st.films++;
+  const r = rec ? rec.label : '';
+  bumpStudio(s, st, /Smash/.test(r) ? 7 : /Hit/.test(r) ? 4 : /Flop/.test(r) ? -6 : 1);
+}
+
+// A trusted director or studio may bring you an offer made for you — a lead with
+// a built-in advocate, not a cattle-call audition.
+function championRole(s) {
+  const role = makeRole(s.fame, false);
+  role.billing = 'lead';
+  role.part = 'Lead — offered to you';
+  role.fameReq = Math.max(0, role.fameReq - 14);
+  role.pay = Math.round(role.pay * 1.25);
+  role.expires = 6;
+  role.callback = false;
+  return role;
+}
+
+function maybeIndustryOffer(s) {
+  if (isBusy(s) || !s.hasAgent) return;
+  if (s.offers.some((o) => o.from)) return;            // one championed offer at a time
+  const dirFans = (s.directors || []).filter((d) => d.rel >= 68 && d.films > 0);
+  const stFans = (s.studios || []).filter((x) => x.rel >= 70 && x.films > 0);
+  if (dirFans.length && Math.random() < 0.1) {
+    const d = dirFans[Math.floor(Math.random() * dirFans.length)];
+    const role = championRole(s);
+    role.dirId = d.id;
+    role.from = { kind: 'director', name: d.name };
+    s.offers.unshift(role);
+    pushLog(s, `🎬 Director ${d.name} is attaching you to "${role.title}" — they want you, specifically.`);
+  } else if (stFans.length && Math.random() < 0.08) {
+    const st = stFans[Math.floor(Math.random() * stFans.length)];
+    const role = championRole(s);
+    role.studioId = st.id;
+    role.from = { kind: 'studio', name: st.name };
+    s.offers.unshift(role);
+    pushLog(s, `🏢 ${st.name} wants you to lead "${role.title}" — a studio that trusts you.`);
+  }
+}
+
 export function startAudition(s, roleId) {
   const setup = beginAudition(s, roleId);
   if (!setup.ok) return setup;
   const role = setup.role;
+  const championDir = role.dirId ? (s.directors || []).find((d) => d.id === role.dirId) : null;
   s.auditionScene = {
     roleId,
     role,
-    director: getOrCreateDirector(s, role),
+    director: championDir || getOrCreateDirector(s, role),
     note: DIRECTOR_NOTES[Math.floor(Math.random() * DIRECTOR_NOTES.length)],
     beat: 0,
     perf: 0,
@@ -1761,6 +1836,7 @@ export function advanceWeek(s) {
       if (!isAd) {
         grantRoyalty(s, a.role.title, cred.result, a.role.billing);
         tickFranchise(s, a.role, quality);
+        creditStudio(s, a.role, rec);
       }
       const recMsg = rec ? ` ${rec.emoji} ${rec.label} (🍅 ${sc.critics} / 🍿 ${sc.audience}).` : '';
       pushLog(s, `🎉 "${a.role.title}" wrapped!${recMsg} +${fameGain} fame, +${a.role.skillGain} acting.`);
@@ -1812,6 +1888,9 @@ export function advanceWeek(s) {
 
   // A dormant franchise may resurface with a sequel offer.
   maybeOfferSequel(s);
+
+  // A director or studio who rates you may bring an offer made for you.
+  maybeIndustryOffer(s);
 
   // Advance the calendar
   s.week++;

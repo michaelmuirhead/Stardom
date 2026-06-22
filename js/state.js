@@ -33,6 +33,7 @@ export function newGame(playerName, difficultyKey) {
     genres: Object.fromEntries(GENRE_KEYS.map((k) => [k, 0])), // affinity XP
     contacts: [],        // co-stars & industry relationships
     directors: [],       // directors you've read for / worked with (they remember you)
+    studios: [],         // studios whose films you've carried (standing 0..100)
     auditionScene: null, // an in-progress played audition
     partner: null,       // current romantic partner (contact id)
     rivals: [makeRival(START.fame), makeRival(START.fame)], // career-long peers
