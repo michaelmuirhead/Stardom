@@ -70,6 +70,44 @@ export function specialty(s) {
   return best ? { key: best, ...GENRES[best], value: bestV } : null;
 }
 
+// ---- Public image / persona ------------------------------------------------
+// Distinct from genre typecasting: this is WHO the public thinks you are, shaped
+// by the kind of work you chase and how you handle the spotlight. A defined
+// image opens some doors and closes others — a real strategic identity.
+export const IMAGES = {
+  artist: { key: 'artist', icon: '🎭', label: 'Serious Artist', blurb: 'Prestige directors seek you out and critics give you the benefit of the doubt — but studios doubt you can open a blockbuster.' },
+  draw: { key: 'draw', icon: '💥', label: 'Blockbuster Draw', blurb: 'Studios trust you to open a movie and brands line up — but the prestige world looks down its nose at you.' },
+  tabloid: { key: 'tabloid', icon: '📸', label: 'Tabloid Fixture', blurb: 'Famous for being famous: notoriety feeds your fame, but your reputation and shot at serious roles suffer.' },
+  pro: { key: 'pro', icon: '🎯', label: 'Consummate Pro', blurb: 'Known as reliable and easy to work with — a quiet edge in every audition room and with every studio.' },
+};
+
+function nudgeImage(s, key, amt) {
+  if (!s.image) s.image = { artist: 0, draw: 0, tabloid: 0, pro: 0 };
+  if (!(key in s.image)) s.image[key] = 0;
+  s.image[key] = Math.max(0, +(s.image[key] + amt).toFixed(1));
+}
+
+// A completed film shapes how the public sees you, by its kind and how it landed.
+function imageFromWork(s, category, sc, billing) {
+  const prestige = ['indie', 'theatre', 'documentary', 'tvmovie', 'miniseries'].includes(category);
+  const commercial = ['movie', 'streamfilm', 'tvshow', 'streamseries'].includes(category);
+  const lead = billing === 'lead';
+  if (prestige && sc && sc.critics >= 72) nudgeImage(s, 'artist', lead ? 2.4 : 1.4);
+  else if (prestige) nudgeImage(s, 'artist', 0.8);
+  if (commercial && sc && sc.audience >= 65) nudgeImage(s, 'draw', lead ? 3.2 : 1.9);
+  else if (commercial) nudgeImage(s, 'draw', lead ? 1.3 : 0.6);
+}
+
+// Your declared public image, once a clear front-runner emerges.
+export function publicImage(s) {
+  const im = s.image || {};
+  const ranked = Object.keys(IMAGES).map((k) => [k, im[k] || 0]).sort((a, b) => b[1] - a[1]);
+  const [topK, topV] = ranked[0];
+  const second = ranked[1] ? ranked[1][1] : 0;
+  if (topV < 12 || topV - second < 4) return null; // not yet defined
+  return { ...IMAGES[topK], score: topV };
+}
+
 // ---- Helpers ---------------------------------------------------------------
 export function isBusy(s) {
   return !!s.active
@@ -185,6 +223,16 @@ export function auditionChance(s, role) {
   }
   // Poor health reads on camera and saps your auditions.
   if ((s.health ?? 100) < 50) chance -= (50 - s.health) / 300;
+  // Your public image opens some rooms and closes others.
+  const img = publicImage(s);
+  if (img) {
+    const prestige = ['indie', 'theatre', 'documentary', 'tvmovie', 'miniseries'].includes(role.category);
+    const commercial = ['movie', 'streamfilm', 'tvshow', 'streamseries'].includes(role.category);
+    if (img.key === 'pro') chance += 0.04;
+    if (img.key === 'tabloid') chance -= 0.035;
+    if (img.key === 'artist') chance += prestige ? 0.06 : commercial ? -0.045 : 0;
+    if (img.key === 'draw') chance += commercial ? 0.06 : prestige ? -0.04 : 0;
+  }
   return clamp(chance, 0.03, 0.97);
 }
 
@@ -397,16 +445,20 @@ function championRole(s) {
 function maybeIndustryOffer(s) {
   if (isBusy(s) || !s.hasAgent) return;
   if (s.offers.some((o) => o.from)) return;            // one championed offer at a time
+  const img = publicImage(s);
+  // A Serious Artist gets courted by auteurs; a Blockbuster Draw by the studios.
+  const dirChance = 0.1 + (img && img.key === 'artist' ? 0.06 : 0);
+  const stChance = 0.08 + (img && img.key === 'draw' ? 0.06 : 0);
   const dirFans = (s.directors || []).filter((d) => d.rel >= 68 && d.films > 0);
   const stFans = (s.studios || []).filter((x) => x.rel >= 70 && x.films > 0);
-  if (dirFans.length && Math.random() < 0.1) {
+  if (dirFans.length && Math.random() < dirChance) {
     const d = dirFans[Math.floor(Math.random() * dirFans.length)];
     const role = championRole(s);
     role.dirId = d.id;
     role.from = { kind: 'director', name: d.name };
     s.offers.unshift(role);
     pushLog(s, `🎬 Director ${d.name} is attaching you to "${role.title}" — they want you, specifically.`);
-  } else if (stFans.length && Math.random() < 0.08) {
+  } else if (stFans.length && Math.random() < stChance) {
     const st = stFans[Math.floor(Math.random() * stFans.length)];
     const role = championRole(s);
     role.studioId = st.id;
@@ -456,7 +508,7 @@ export function auditionChoose(s, choiceKey) {
   // A chemistry read only flatters you if you've got the wattage to carry it.
   if (choice.fameGate) { pts += (s.fame >= 35 ? 0.8 : -1.0); rapport += s.fame >= 35 ? 2 : 0; }
   // Taking the note well reads as professionalism.
-  if (choice.rep) s.reputation = clamp(+(s.reputation + choice.rep).toFixed(1), 0, 100);
+  if (choice.rep) { s.reputation = clamp(+(s.reputation + choice.rep).toFixed(1), 0, 100); nudgeImage(s, 'pro', 0.5); }
   // Matching the director's specific note lands harder.
   if (sc.note && choice.key === 'take') rapport += 2;
 
@@ -599,6 +651,7 @@ export function resolveChoice(s, idx) {
     const p = s.contacts.find((c) => c.id === s.partner);
     if (p) p.rel = clamp(p.rel + d.partnerRel, 0, 100);
   }
+  if (d.image) for (const k of Object.keys(d.image)) nudgeImage(s, k, d.image[k]);
   // On-set deltas: rehearsal prep for the current shoot, and co-star bonding.
   const proj = s.active
     || (s.activeSeries && s.activeSeries.status === 'filming' ? s.activeSeries : null)
@@ -1018,6 +1071,7 @@ export function acceptBrandDeal(s, id) {
   s.endorsements.push({ brand: o.brand, weekly: o.weekly, weeksLeft: o.weeks });
   s.brandOffers.splice(i, 1);
   gainFame(s, o.fame);
+  nudgeImage(s, 'draw', 1);   // endorsements read as mainstream celebrity
   pushLog(s, `🤝 Signed a ${o.brand} endorsement — $${o.weekly.toLocaleString()}/wk for ${o.weeks} weeks.`);
   return { ok: true, msg: `Endorsing ${o.brand}.` };
 }
@@ -1347,6 +1401,7 @@ function maybeStartFranchise(s, info) {
     strength: Math.round(info.quality),                   // erodes with sequels
     cooldown: Math.round(rf(18, 42)),                     // weeks until a sequel
   });
+  nudgeImage(s, 'draw', 2);   // a franchise cements you as a commercial draw
   pushLog(s, `🌟 "${info.title}" is a phenomenon — the studio smells a franchise.`);
 }
 
@@ -1616,10 +1671,14 @@ function judgeCategory(s, credit, cat, cer) {
 
 // Festivals: a critically-strong recent indie/documentary (or any film) earns a
 // selection — and, if exceptional, the top prize — boosting prestige, rep & fame.
+const FESTIVAL_FAVORED = new Set(['Indie Film', 'Documentary']);
 function runFestival(s, fest) {
   const now = absWeek(s);
+  // Festivals anoint prestige work — indies and docs — not studio tentpoles
+  // (unless a blockbuster is a genuine critical masterpiece).
   const pool = s.filmography.filter((c) => c.wk != null && c.wk > now - WEEKS_PER_YEAR && c.wk <= now
-    && c.medium === 'film' && (c.critics ?? 0) >= 55);
+    && c.medium === 'film' && (c.critics ?? 0) >= 55
+    && (FESTIVAL_FAVORED.has(c.category) || (c.critics ?? 0) >= 82));
   if (!pool.length) return;
   const best = pool.reduce((a, b) => ((b.critics ?? 0) > (a.critics ?? 0) ? b : a));
   const won = (best.critics ?? 0) >= 80 && Math.random() < 0.5;
@@ -1627,6 +1686,7 @@ function runFestival(s, fest) {
   s.careerPrestige += prestige;
   s.reputation = clamp(s.reputation + (won ? 6 : 3), 0, 100);
   gainFame(s, won ? 3 : 1.5);
+  nudgeImage(s, 'artist', won ? 2 : 1);   // festivals burnish the serious-artist image
   pushLog(s, won
     ? `${fest.icon} "${best.title}" WON the top prize at ${fest.name}! A festival sensation.`
     : `${fest.icon} "${best.title}" was selected at ${fest.name} — critical buzz builds.`);
@@ -1837,6 +1897,9 @@ export function advanceWeek(s) {
         grantRoyalty(s, a.role.title, cred.result, a.role.billing);
         tickFranchise(s, a.role, quality);
         creditStudio(s, a.role, rec);
+        imageFromWork(s, a.role.category, sc, a.role.billing);
+      } else {
+        nudgeImage(s, 'draw', 0.6); // commercials lean mainstream/celebrity
       }
       const recMsg = rec ? ` ${rec.emoji} ${rec.label} (🍅 ${sc.critics} / 🍿 ${sc.audience}).` : '';
       pushLog(s, `🎉 "${a.role.title}" wrapped!${recMsg} +${fameGain} fame, +${a.role.skillGain} acting.`);

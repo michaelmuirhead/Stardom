@@ -62,6 +62,23 @@ Your odds depend on your **acting skill**, **fame**, **reputation**, and whether
 you have an **agent**. Land a role and you're in production for several weeks,
 earning pay and—on wrap—fame, skill, and prestige.
 
+**Auditions are scenes you play, not dice rolls.** When you audition you step
+into the room and *perform*: read the sides (go big and risky, play it grounded,
+disappear into it method-style, or ask about the character first), respond to
+the director's redirect (take the note, commit to your read, or split the
+difference), and choose how to close (push for a chemistry read, linger to build
+rapport, or leave them wanting). Each beat is checked against your craft with
+real risk and reward, and your performance shifts your booking odds — a great
+read can win a part you'd have lost, a blown one can cost you a sure thing. Every
+audition is run by a **named director who remembers you** (see below).
+
+**Opportunities are scarce.** Casting windows close: every offer shows how long
+it stays open (`⏳ closes this week`) and lapses if you sit on it. The board
+isn't an infinite buffet — fresh offers trickle in only when you're free to take
+them, and **while you're committed to a shoot no new work arrives**, so a long
+blockbuster means coming back to a thinner board and rebuilding momentum. Every
+"yes" is a real choice about your time.
+
 **Billing — from bit parts to leading roles.** Every role has a billing tier:
 **Cameo → Supporting → Lead**. As an unknown you'll only be offered cameos and
 small supporting parts; leading roles open up as your fame grows, and they pay
@@ -133,6 +150,25 @@ live large, but keep the work coming.
 
 **First-time tutorial.** New players get a short guided walkthrough of the core
 loop on their first game; replay it anytime via the **❓** button in the header.
+
+**The industry remembers you.** Directors and studios hold a standing on you
+(shown on the **People** tab as champion / warm / neutral / cool / cold).
+Recurring directors reappear, and a director who loves you — or a studio whose
+films you've carried — will **champion** you, bringing a lead offer made
+specifically for you (flagged with who it's from). Their standing tilts your
+audition odds for their projects. Studio standing is earned the hard way: deliver
+a hit and they trust you with the next one; flop and they cool off.
+
+**Your public image is a choice.** Beyond genre, you cultivate a **persona** —
+🎭 *Serious Artist*, 💥 *Blockbuster Draw*, 📸 *Tabloid Fixture*, or 🎯 *Consummate
+Pro* — that emerges from the work you chase and how you handle the press (tracked
+on your **Career** page). It opens some doors and closes others: a Serious Artist
+is courted by auteurs and forgiven by critics but doubted by studios for tentpoles;
+a Blockbuster Draw is trusted to open a movie and chased by brands but sneered at
+by the prestige world; a Tabloid Fixture turns notoriety into fame at the cost of
+reputation and serious roles; a Consummate Pro gets a quiet edge everywhere.
+Narrative dilemmas (a staged showmance, a public feud, a viral meltdown, passion
+vs. paycheck) push your image one way or another.
 
 **Co-stars & relationships.** Land a role and you meet co-stars, who become
 lasting contacts. A close, famous ally boosts your audition odds; a famous

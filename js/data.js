@@ -302,8 +302,17 @@ export const CHOICE_EVENTS = [
     title: '📰 A Tabloid Comes Knocking',
     text: 'A gossip magazine offers $250,000 for a tell-all about a co-star\'s on-set behavior.',
     options: [
-      { label: 'Take the money', outcome: () => ({ money: 250000, rep: -8, partnerRel: -10, msg: 'You cash in — but the industry frowns, and it stings close to home.' }) },
-      { label: 'Politely decline', outcome: () => ({ rep: 4, msg: 'You keep your mouth shut. Colleagues note your discretion.' }) },
+      { label: 'Take the money', outcome: () => ({ money: 250000, rep: -8, partnerRel: -10, image: { tabloid: 4 }, msg: 'You cash in — but the industry frowns, and it stings close to home.' }) },
+      { label: 'Politely decline', outcome: () => ({ rep: 4, image: { pro: 2 }, msg: 'You keep your mouth shut. Colleagues note your discretion.' }) },
+    ],
+  },
+  {
+    id: 'staged_romance', when: (s) => s.fame > 30,
+    title: '💋 A Showmance',
+    text: 'Your publicist pitches a staged romance with a co-star to juice the press tour. A tabloid will pay $250k for the exclusive.',
+    options: [
+      { label: 'Play it up for the cameras', outcome: () => ({ money: 250000, fame: rf(3, 7), rep: -4, image: { tabloid: 6, artist: -2 }, msg: 'The "couple" dominates the news cycle. Famous — and a little cheaper for it.' }) },
+      { label: 'Keep your private life private', outcome: () => ({ rep: 5, image: { artist: 2, pro: 1 }, msg: 'You refuse to perform your personal life. The serious crowd respects it.' }) },
     ],
   },
   {
@@ -320,8 +329,8 @@ export const CHOICE_EVENTS = [
     title: '😤 A Public Jab',
     text: 'A rival took a swipe at you in an interview. The press wants your response.',
     options: [
-      { label: 'Clap back', outcome: () => ({ fame: rf(2, 5), rivalry: 15, rep: -3, msg: 'The feud makes headlines. Fame up, but it turns ugly.' }) },
-      { label: 'Take the high road', outcome: () => ({ rep: 5, rivalry: -5, msg: 'You stay gracious. The industry respects it.' }) },
+      { label: 'Clap back', outcome: () => ({ fame: rf(2, 5), rivalry: 15, rep: -3, image: { tabloid: 3 }, msg: 'The feud makes headlines. Fame up, but it turns ugly.' }) },
+      { label: 'Take the high road', outcome: () => ({ rep: 5, rivalry: -5, image: { pro: 2 }, msg: 'You stay gracious. The industry respects it.' }) },
     ],
   },
   {
@@ -329,8 +338,8 @@ export const CHOICE_EVENTS = [
     title: '📹 Caught on Camera',
     text: 'A clip of you losing your temper on set is going viral.',
     options: [
-      { label: 'Issue a sincere apology', outcome: () => ({ fame: -2, rep: 4, msg: 'You own it. Fans forgive; your reputation recovers.' }) },
-      { label: 'Double down', outcome: () => ({ fame: rf(2, 6), rep: -7, msg: 'You lean into the chaos. More famous, less respected.' }) },
+      { label: 'Issue a sincere apology', outcome: () => ({ fame: -2, rep: 4, image: { pro: 2 }, msg: 'You own it. Fans forgive; your reputation recovers.' }) },
+      { label: 'Double down', outcome: () => ({ fame: rf(2, 6), rep: -7, image: { tabloid: 4 }, msg: 'You lean into the chaos. More famous, less respected.' }) },
     ],
   },
   {
@@ -348,8 +357,8 @@ export const CHOICE_EVENTS = [
     title: '🎬 Passion vs. Paycheck',
     text: 'Two scripts land on your desk: a soulless blockbuster cameo and a tiny, brilliant indie.',
     options: [
-      { label: 'Chase the paycheck', outcome: () => ({ money: 2000000, rep: -3, msg: 'Easy money. The art crowd sighs.' }) },
-      { label: 'Follow your heart', outcome: () => ({ rep: 6, acting: rf(1, 3), msg: 'The indie pays nothing but feeds your craft and credibility.' }) },
+      { label: 'Chase the paycheck', outcome: () => ({ money: 2000000, rep: -3, image: { draw: 4, artist: -2 }, msg: 'Easy money. The art crowd sighs.' }) },
+      { label: 'Follow your heart', outcome: () => ({ rep: 6, acting: rf(1, 3), image: { artist: 4, draw: -2 }, msg: 'The indie pays nothing but feeds your craft and credibility.' }) },
     ],
   },
   {

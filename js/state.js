@@ -40,6 +40,7 @@ export function newGame(playerName, difficultyKey) {
     pendingChoice: null, // an unresolved narrative dilemma
 
     careerPrestige: 0,   // cumulative prestige across your whole career
+    image: { artist: 0, draw: 0, tabloid: 0, pro: 0 }, // cultivated public persona
     history: [],         // yearly snapshots for the career graph
     assets: [],          // owned lifestyle assets (keys)
     royalties: [],       // decaying residual income from past hits

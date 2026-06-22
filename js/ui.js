@@ -12,6 +12,7 @@ import {
   buyAsset, ownedAssets, prepareRole, negotiateRenewal,
   signAgent, dropAgent, toggleStaff, agentTierInfo, agentTierReady,
   socialPost, acceptBrandDeal, refreshBrandOffers,
+  publicImage, IMAGES,
 } from './engine.js';
 
 let S = null;        // current game state
@@ -782,6 +783,28 @@ function careerView() {
   } else {
     wrap.appendChild(el('p', 'muted small', 'More experience in a genre raises your audition odds for similar roles — and defines your public brand. Spread too thin in one and you risk being typecast.'));
   }
+
+  // Public image / persona
+  wrap.appendChild(el('h3', null, '🪞 Public Image'));
+  const img = publicImage(S);
+  if (img) {
+    wrap.appendChild(el('div', 'panel-block image-block',
+      `<div class="card-title">${img.icon} ${img.label}</div><p class="muted small" style="margin:6px 0 0">${img.blurb}</p>`));
+  } else {
+    wrap.appendChild(el('p', 'muted small', 'Your public image is still forming. The kind of work you chase — prestige indies vs. blockbusters — and how you handle the press will define who Hollywood thinks you are, opening some doors and closing others.'));
+  }
+  const im = S.image || {};
+  const imgMax = Math.max(1, ...Object.keys(IMAGES).map((k) => im[k] || 0));
+  const igrid = el('div', 'skills');
+  for (const k of Object.keys(IMAGES)) {
+    const v = im[k] || 0;
+    const row = el('div', 'skill-row');
+    row.innerHTML = `<span class="skill-lab">${IMAGES[k].icon} ${IMAGES[k].label}</span>
+      <div class="bar"><div class="bar-fill" style="width:${(v / imgMax) * 100}%"></div></div>
+      <span class="skill-num">${Math.round(v)}</span>`;
+    igrid.appendChild(row);
+  }
+  wrap.appendChild(igrid);
 
   const tot = careerTotals(S);
   const meta = el('div', 'meta-row');

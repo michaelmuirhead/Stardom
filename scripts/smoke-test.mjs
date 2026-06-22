@@ -7,7 +7,7 @@ import {
   advanceWeek, audition, auditionChance, takeClass, network, rest, sideJob,
   extraWork, toggleAgent, writeScript, startProduction, isBusy, catchUp, quitSeries,
   agentReady, negotiate, resolveChoice, buyAsset, ownedAssets, pitchScript, careerTotals,
-  startAudition, auditionChoose, currentAuditionBeat, closeAudition,
+  startAudition, auditionChoose, currentAuditionBeat, closeAudition, publicImage,
 } from '../js/engine.js';
 
 let failures = 0;
@@ -312,6 +312,40 @@ assert(aw.milestones >= 6, `career milestones are completed over a long career (
       if (cs.offers.some((o) => o.from && o.from.kind === 'director')) championed = true;
     }
     assert(championed, 'a director who champions you brings a personal offer');
+  }
+
+  // Identity: the kind of career you play declares a matching public image.
+  {
+    function imageCareer(prefer) {
+      const s = newGame('Persona', 'easy');
+      s.hasAgent = true; s.agentTier = 'powerhouse'; s.acting = 75; s.fame = 55;
+      const prestige = ['indie', 'theatre', 'documentary', 'tvmovie', 'miniseries'];
+      const commercial = ['movie', 'streamfilm', 'tvshow', 'streamseries'];
+      const want = prefer === 'art' ? prestige : commercial;
+      for (let w = 0; w < 350 && !s.gameOver; w++) {
+        s.money = 5e6;
+        if (!isBusy(s) && s.energy >= 24 && s.offers.length) {
+          const role = s.offers.find((o) => want.includes(o.category));
+          if (role) {
+            startAudition(s, role.id);
+            let g = 0;
+            while (s.auditionScene && !s.auditionScene.done && g++ < 8) {
+              const b = currentAuditionBeat(s);
+              const k = (b.choices.find((c) => ['true', 'take', 'chat'].includes(c.key)) || b.choices[0]).key;
+              auditionChoose(s, k);
+            }
+            if (s.auditionScene && s.auditionScene.done) closeAudition(s);
+          }
+        }
+        advanceWeek(s);
+        s.releaseNight = null; s.pendingChoice = null; s.ceremonyNight = null;
+      }
+      return publicImage(s);
+    }
+    const artist = imageCareer('art');
+    const draw = imageCareer('commercial');
+    assert(artist && artist.key === 'artist', `a prestige career declares the Serious Artist image (${artist && artist.label})`);
+    assert(draw && draw.key === 'draw', `a blockbuster career declares the Blockbuster Draw image (${draw && draw.label})`);
   }
 
   // Rivals advance over the years.
