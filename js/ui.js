@@ -1,11 +1,15 @@
 // ui.js — rendering & event wiring
-import { CLASSES, GENRES, GENRE_KEYS, CEREMONIES, MILESTONES, BILLING, ASSETS, fameTier } from './data.js';
+import {
+  CLASSES, GENRES, GENRE_KEYS, CEREMONIES, MILESTONES, BILLING, ASSETS, fameTier,
+  AGENT_TIERS, PUBLICIST_FEE, MANAGER_CUT,
+} from './data.js';
 import {
   audition, auditionChance, takeClass, network, rest, sideJob, extraWork, toggleAgent, wellness, agePhase,
   writeScript, pitchScript, startProduction, estimateProduction, advanceWeek, isBusy, BUDGET_TIERS,
   catchUp, quitSeries, specialty, diffOf, agentReady, AGENT_FAME_REQ, AGENT_CREDITS_REQ,
   retire, careerLegacy, careerTotals, checkMilestones, typecastInfo, negotiate, resolveChoice,
   buyAsset, ownedAssets, prepareRole, negotiateRenewal,
+  signAgent, dropAgent, toggleStaff, agentTierInfo, agentTierReady,
 } from './engine.js';
 
 let S = null;        // current game state
@@ -542,8 +546,54 @@ function financesView() {
 }
 
 // ---- People view (co-stars & relationships) --------------------------------
+function representationBlock() {
+  const wrap = el('div');
+  wrap.appendChild(el('h2', null, '🕴️ Representation'));
+  const cur = agentTierInfo(S);
+  const block = el('div', 'panel-block');
+  block.appendChild(el('p', 'muted small',
+    cur ? `Your agent: <b>${cur.icon} ${cur.name}</b> (${Math.round(cur.cut * 100)}% cut, +${Math.round(cur.odds * 100)}% odds).`
+      : 'You have no agent — only open-call gigs. Sign one to unlock studio, streaming and TV roles.'));
+  const tierRow = el('div', 'grid');
+  for (const t of AGENT_TIERS) {
+    const owned = S.agentTier === t.key;
+    const ready = agentTierReady(S, t);
+    const card = el('div', 'card' + (owned ? ' goal-done' : ''));
+    card.innerHTML = `<div class="card-head"><span class="card-ic">${t.icon}</span>
+      <div><div class="card-title">${t.name}</div><div class="muted small">${t.blurb}</div></div></div>
+      <div class="reqs small"><span>${Math.round(t.cut * 100)}% cut</span><span>+${Math.round(t.odds * 100)}% odds</span><span>+${t.offers + 1} offers</span></div>
+      <div class="muted small">Needs ${t.fameReq} fame · ${t.credReq} credits</div>`;
+    if (owned) card.appendChild(el('div', 'good small', '✅ Current'));
+    else card.appendChild(actionBtn(S.hasAgent ? 'Switch' : 'Sign', () => act(signAgent(S, t.key)), !ready));
+    tierRow.appendChild(card);
+  }
+  block.appendChild(tierRow);
+  if (S.hasAgent) {
+    const drop = actionBtn('👋 Drop agent', () => act(dropAgent(S)));
+    drop.classList.add('mini');
+    block.appendChild(drop);
+  }
+  // Publicist & manager
+  const staff = el('div', 'grid');
+  const pub = el('div', 'card' + (S.publicist ? ' goal-done' : ''));
+  pub.innerHTML = `<div class="card-title">📣 Publicist</div>
+    <div class="muted small">Softens scandals, amplifies good press. ${money(PUBLICIST_FEE)}/wk.</div>`;
+  pub.appendChild(actionBtn(S.publicist ? 'Let go' : 'Hire', () => act(toggleStaff(S, 'publicist'))));
+  staff.appendChild(pub);
+  const mgr = el('div', 'card' + (S.manager ? ' goal-done' : ''));
+  mgr.innerHTML = `<div class="card-title">📋 Manager</div>
+    <div class="muted small">Sharper deals & renewals. Takes a ${Math.round(MANAGER_CUT * 100)}% cut.</div>`;
+  mgr.appendChild(actionBtn(S.manager ? 'Let go' : 'Hire', () => act(toggleStaff(S, 'manager'))));
+  staff.appendChild(mgr);
+  block.appendChild(staff);
+  wrap.appendChild(block);
+  return wrap;
+}
+
 function peopleView() {
   const wrap = el('div', 'view');
+
+  wrap.appendChild(representationBlock());
 
   // Rivals
   if (S.rivals && S.rivals.length) {

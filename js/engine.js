@@ -4,6 +4,7 @@ import {
   DIFFICULTIES, GENRES, GENRE_KEYS, CEREMONIES, creditMedium,
   HALL_OF_FAME, LIFETIME_ACHIEVEMENT_MIN, MILESTONES, CHOICE_EVENTS,
   ASSETS, taxFor, CATEGORIES, fameQuote, STUDIOS,
+  AGENT_TIERS, PUBLICIST_FEE, MANAGER_CUT,
   projectTitle, makeRole, makeCostar, makeRival,
 } from './data.js';
 import { pushLog, refreshOffers } from './state.js';
@@ -156,7 +157,7 @@ export function auditionChance(s, role) {
   const fameFactor = (s.fame - role.fameReq) / 60;
   const repFactor = (s.reputation - 30) / 200;
   let chance = 0.42 + skillFactor + fameFactor + repFactor;
-  if (s.hasAgent) chance += 0.08;
+  chance += agentOdds(s);
   chance += diffOf(s).oddsBonus;
   chance += connectionBonus(s);
   // Specialization: experience in this genre makes you a natural fit.
@@ -243,7 +244,7 @@ export function negotiate(s, roleId) {
   if (!role) return { ok: false, msg: 'That offer is gone.' };
   if (role.negotiated) return { ok: false, msg: 'You\'ve already negotiated this deal.' };
 
-  const chance = clamp(0.32 + s.reputation / 200 + s.fame / 220 + (s.hasAgent ? 0.25 : 0), 0.1, 0.92);
+  const chance = clamp(0.32 + s.reputation / 200 + s.fame / 220 + (s.hasAgent ? 0.25 : 0) + (s.manager ? 0.12 : 0), 0.1, 0.95);
   if (Math.random() < chance) {
     const factor = rf(1.12, 1.4);
     role.pay = Math.round(role.pay * factor);
@@ -403,7 +404,7 @@ export function negotiateRenewal(s) {
   const sh = s.activeSeries;
   if (!sh || !sh.pendingRenewal) return { ok: false, msg: 'Nothing to renegotiate.' };
   sh.pendingRenewal = false;
-  const chance = clamp(0.3 + sh.ratings / 200 + s.reputation / 250 + s.fame / 300 + (s.hasAgent ? 0.2 : 0), 0.1, 0.95);
+  const chance = clamp(0.3 + sh.ratings / 200 + s.reputation / 250 + s.fame / 300 + (s.hasAgent ? 0.2 : 0) + (s.manager ? 0.12 : 0), 0.1, 0.95);
   if (Math.random() < chance) {
     const bump = rf(0.15, 0.45);
     sh.salary = Math.round(sh.salary * (1 + bump));
@@ -622,25 +623,73 @@ export function agentReady(s) {
   };
 }
 
-export function toggleAgent(s) {
+// ---- Representation helpers ----
+export function agentTierInfo(s) {
+  return AGENT_TIERS.find((t) => t.key === s.agentTier) || (s.hasAgent ? AGENT_TIERS[0] : null);
+}
+export function agentTierReady(s, tier) {
+  return s.fame >= tier.fameReq && s.filmography.length >= tier.credReq;
+}
+function representationCut(s) {
+  const t = agentTierInfo(s);
+  return (t ? t.cut : 0) + (s.manager ? MANAGER_CUT : 0);
+}
+function agentOdds(s) {
+  const t = agentTierInfo(s);
+  return t ? t.odds : 0;
+}
+
+export function signAgent(s, tierKey) {
   if (s.gameOver) return { ok: false, msg: 'The game is over.' };
-  if (!s.hasAgent) {
-    const req = agentReady(s);
-    if (!req.met) {
-      return {
-        ok: false,
-        msg: `No agent will sign you yet — need ${AGENT_FAME_REQ} fame & ${AGENT_CREDITS_REQ} credits (you have ${Math.floor(s.fame)} fame, ${req.credits} credit${req.credits === 1 ? '' : 's'}).`,
-      };
-    }
-    s.hasAgent = true;
-    pushLog(s, '🕴️ You signed with a talent agent! The big auditions — studio films, series regular roles — are open to you now. They take a cut, but it\'s worth it.');
-    refreshOffers(s);
-    return { ok: true, msg: 'Signed with an agent! The real auditions begin.' };
+  const tier = AGENT_TIERS.find((t) => t.key === tierKey);
+  if (!tier) return { ok: false, msg: 'Unknown agency.' };
+  if (s.agentTier === tierKey) return { ok: false, msg: 'They already represent you.' };
+  if (!agentTierReady(s, tier)) {
+    return { ok: false, msg: `${tier.name} won't sign you yet — need ${tier.fameReq} fame & ${tier.credReq} credits.` };
   }
+  const upgrade = s.hasAgent;
+  s.agentTier = tierKey;
+  s.hasAgent = true;
+  pushLog(s, `${tier.icon} You ${upgrade ? 'switched to' : 'signed with'} ${tier.name} (${Math.round(tier.cut * 100)}% cut). Bigger auditions await.`);
+  refreshOffers(s);
+  return { ok: true, msg: `${upgrade ? 'Upgraded to' : 'Signed with'} ${tier.name}.` };
+}
+
+export function dropAgent(s) {
+  if (!s.hasAgent) return { ok: false, msg: 'You have no agent.' };
+  s.agentTier = null;
   s.hasAgent = false;
   pushLog(s, '👋 You parted ways with your agent. Back to open calls.');
   refreshOffers(s);
   return { ok: true, msg: 'Dropped your agent.' };
+}
+
+// Hire/fire a publicist (weekly retainer) or manager (a cut for clout).
+export function toggleStaff(s, who) {
+  if (s.gameOver) return { ok: false, msg: 'The game is over.' };
+  if (who === 'publicist') {
+    s.publicist = !s.publicist;
+    pushLog(s, s.publicist ? `📣 Hired a publicist ($${PUBLICIST_FEE.toLocaleString()}/wk) — they\'ll soften scandals and amplify good press.` : '📣 Let your publicist go.');
+    return { ok: true, msg: s.publicist ? 'Publicist hired.' : 'Publicist released.' };
+  }
+  if (who === 'manager') {
+    s.manager = !s.manager;
+    pushLog(s, s.manager ? `📋 Hired a manager (${Math.round(MANAGER_CUT * 100)}% cut) — sharper deals and renewals.` : '📋 Let your manager go.');
+    return { ok: true, msg: s.manager ? 'Manager hired.' : 'Manager released.' };
+  }
+  return { ok: false, msg: 'Unknown role.' };
+}
+
+// Back-compat: sign the best agency you qualify for, or drop your agent.
+export function toggleAgent(s) {
+  if (s.gameOver) return { ok: false, msg: 'The game is over.' };
+  if (s.hasAgent) return dropAgent(s);
+  const best = [...AGENT_TIERS].reverse().find((t) => agentTierReady(s, t));
+  if (!best) {
+    const req = agentReady(s);
+    return { ok: false, msg: `No agent will sign you yet — need ${AGENT_FAME_REQ} fame & ${AGENT_CREDITS_REQ} credits (you have ${Math.floor(s.fame)} fame, ${req.credits}).` };
+  }
+  return signAgent(s, best.key);
 }
 
 // ---- Writing / Producing / Directing --------------------------------------
@@ -996,9 +1045,16 @@ function rollEvents(s) {
 function applyDelta(s, d) {
   if (!d) return;
   if (d.money) s.money += d.money;
-  if (d.fame) gainFame(s, d.fame);
+  // A publicist softens bad press and amplifies the good.
+  let fame = d.fame || 0;
+  let rep = d.reputation || 0;
+  if (s.publicist) {
+    if (fame < 0) fame *= 0.6; else fame *= 1.15;
+    if (rep < 0) rep *= 0.6;
+  }
+  if (fame) gainFame(s, fame);
+  if (rep) s.reputation = clamp(+(s.reputation + rep).toFixed(1), 0, 100);
   if (d.acting) s.acting = clamp(+(s.acting + d.acting).toFixed(1), 0, 100);
-  if (d.reputation) s.reputation = clamp(+(s.reputation + d.reputation).toFixed(1), 0, 100);
   if (d.energyPenalty) s.energyPenalty = (s.energyPenalty || 0) + d.energyPenalty;
 }
 
@@ -1211,7 +1267,7 @@ export function advanceWeek(s) {
   const D = diffOf(s);
 
   // Living expenses (base + lifestyle upkeep)
-  s.money -= D.living + lifestyleUpkeep(s);
+  s.money -= D.living + lifestyleUpkeep(s) + (s.publicist ? PUBLICIST_FEE : 0);
 
   // Residual income from past hits
   payRoyalties(s);
@@ -1220,7 +1276,7 @@ export function advanceWeek(s) {
   if (s.active) {
     const a = s.active;
     const weekly = Math.round((a.role.pay || 0) * D.payMult / a.totalWeeks);
-    const net = s.hasAgent ? Math.round(weekly * (1 - AGENT_CUT)) : weekly;
+    const net = Math.round(weekly * (1 - representationCut(s)));
     earn(s, net);
     a.weeksLeft--;
     if (a.weeksLeft <= 0 && a.project) {
@@ -1267,7 +1323,7 @@ export function advanceWeek(s) {
   if (s.activeSeries && s.activeSeries.status === 'filming') {
     const sh = s.activeSeries;
     const weekly = Math.round(sh.salary * D.payMult / sh.totalWeeks);
-    earn(s, s.hasAgent ? Math.round(weekly * (1 - AGENT_CUT)) : weekly);
+    earn(s, Math.round(weekly * (1 - representationCut(s))));
     sh.weeksLeft--;
     if (sh.weeksLeft <= 0) endSeason(s);
   }

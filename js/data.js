@@ -16,7 +16,17 @@ export const START = {
 
 export const WEEKS_PER_YEAR = 52;
 export const LIVING_COST = 1500;         // weekly expenses (Normal baseline)
-export const AGENT_CUT = 0.12;           // agent takes a slice of role pay
+export const AGENT_CUT = 0.12;           // legacy default (see AGENT_TIERS)
+
+// ---- Representation: agents, publicist, manager ----------------------------
+// Higher agent tiers take a bigger cut but unlock more & better auditions.
+export const AGENT_TIERS = [
+  { key: 'boutique', name: 'Boutique Agent', icon: '🕴️', cut: 0.10, fameReq: 18, credReq: 3, odds: 0.06, offers: 1, blurb: 'A hungry up-and-comer. Low cut, modest reach.' },
+  { key: 'established', name: 'Established Agency', icon: '🏢', cut: 0.13, fameReq: 45, credReq: 8, odds: 0.10, offers: 2, blurb: 'Real clout and bigger auditions.' },
+  { key: 'powerhouse', name: 'Powerhouse Agency', icon: '💎', cut: 0.16, fameReq: 70, credReq: 15, odds: 0.15, offers: 3, blurb: 'The A-list machine — top roles, top cut.' },
+];
+export const PUBLICIST_FEE = 6000;       // weekly retainer
+export const MANAGER_CUT = 0.05;         // manager's slice (on top of the agent)
 
 // ---- Difficulty (Hollywood-scale economy) ----------------------------------
 export const DIFFICULTIES = {

@@ -1,5 +1,5 @@
 // state.js — game state creation, persistence
-import { START, DIFFICULTIES, GENRE_KEYS, fullName, makeRole, makeRival } from './data.js';
+import { START, DIFFICULTIES, GENRE_KEYS, AGENT_TIERS, fullName, makeRole, makeRival } from './data.js';
 
 const SAVE_KEY = 'stardom.save.v1';
 
@@ -13,6 +13,9 @@ export function newGame(playerName, difficultyKey) {
     ...structuredCloneSafe(START),
     health: 100,         // wellness; affects energy regen & audition odds
     hasAgent: false,
+    agentTier: null,     // 'boutique' | 'established' | 'powerhouse'
+    publicist: false,    // weekly retainer; softens scandals, boosts press
+    manager: false,      // takes a cut; improves negotiations
     energyPenalty: 0,
 
     offers: [],          // available audition roles
@@ -54,7 +57,9 @@ function structuredCloneSafe(o) {
 }
 
 export function refreshOffers(s) {
-  const count = 4 + (s.hasAgent ? 2 : 0);
+  const tier = AGENT_TIERS.find((t) => t.key === s.agentTier);
+  const extra = tier ? tier.offers + 1 : 0;
+  const count = 4 + extra;
   s.offers = Array.from({ length: count }, () => makeRole(s.fame, !s.hasAgent));
 }
 
