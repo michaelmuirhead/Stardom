@@ -281,6 +281,25 @@ assert(aw.milestones >= 6, `career milestones are completed over a long career (
     assert(r.ok && !cs.pendingChoice, 'a narrative dilemma resolves and clears');
   }
 
+  // Scarcity: offers expire if ignored, and a long commitment thins the board.
+  {
+    const os = newGame('Idler', 'normal');
+    const firstIds = os.offers.map((o) => o.id);
+    for (let i = 0; i < 12; i++) advanceWeek(os);          // sit idle, never audition
+    assert(firstIds.some((id) => !os.offers.find((o) => o.id === id)),
+      'unactioned offers expire off the board over time');
+
+    // While tied up on a project, fresh offers stop arriving.
+    const bs = newGame('Busy', 'easy');
+    bs.fame = 40; bs.acting = 60; bs.hasAgent = true; bs.money = 1e7;
+    // Force into a long shoot.
+    bs.active = { role: makeRole(40, false), weeksLeft: 10, totalWeeks: 10, costars: [] };
+    bs.active.role.weeks = 10;
+    const before = bs.offers.length;
+    for (let i = 0; i < 8 && isBusy(bs); i++) { bs.money = 1e7; advanceWeek(bs); }
+    assert(bs.offers.length <= before, 'no new offers arrive while you are committed to a shoot');
+  }
+
   // Rivals advance over the years.
   const rs = newGame('Survivor', 'normal');
   const startTopFame = Math.max(...rs.rivals.map((r) => r.fame));

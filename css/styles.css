@@ -172,6 +172,10 @@ main {
   border-radius: 999px; padding: 2px 10px;
 }
 .badge.sequel { background: #1f2433; color: #9ec1ff; border-color: var(--accent); }
+.exp-chip { font-size: 11px; color: var(--muted); }
+.exp-chip.warn { color: var(--mid); }
+.exp-chip.hot { color: var(--bad); font-weight: 700; }
+.exp-chip.warm { color: var(--gold2); }
 .chance { font-weight: 700; font-size: 13px; }
 .chance.good { color: var(--good); }
 .chance.mid { color: var(--mid); }

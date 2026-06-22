@@ -218,6 +218,9 @@ export function makeRole(playerFame, openCall = false) {
     skillGain,
     weeks,
     prestige,
+    // Casting windows close: an offer lingers only a few weeks before it's
+    // recast. Bigger projects move faster (the part is in demand).
+    expires: Math.max(2, Math.round((openCall ? 5 : 4) - tier + rf(0, 2))),
   };
 }
 

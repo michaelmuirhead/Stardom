@@ -1678,6 +1678,35 @@ export function retire(s) {
 }
 
 // ---- Advance one week ------------------------------------------------------
+// The casting board is a finite, time-sensitive stream — not an infinite buffet.
+// Offers expire if you sit on them, and while you're tied up on a shoot the
+// industry moves on without you, so you return to a thinner board and have to
+// rebuild momentum. That makes every "yes" a real choice about your time.
+function offerCap(s) {
+  const tier = AGENT_TIERS.find((t) => t.key === s.agentTier);
+  return 4 + (tier ? tier.offers + 1 : 0);
+}
+
+function tickOffers(s) {
+  let lostTitle = null;
+  for (const o of s.offers) o.expires = (o.expires ?? 4) - 1;
+  // Callbacks linger — they already want you back — but cold offers lapse.
+  s.offers = s.offers.filter((o) => {
+    if (o.expires > 0 || o.callback) return true;
+    if (!lostTitle) lostTitle = o.title;
+    return false;
+  });
+  if (lostTitle && Math.random() < 0.6) {
+    pushLog(s, `⏳ The casting window on "${lostTitle}" closed — they went another way.`);
+  }
+  // New work only finds you when you're free to take it.
+  if (isBusy(s)) return;
+  const cap = offerCap(s);
+  while (s.offers.length < cap && Math.random() < 0.72) {
+    s.offers.push(makeRole(s.fame, !s.hasAgent));
+  }
+}
+
 export function advanceWeek(s) {
   if (s.gameOver || s.auditionScene) return;
 
@@ -1778,8 +1807,8 @@ export function advanceWeek(s) {
   // Random event
   rollEvents(s);
 
-  // Slowly refresh the audition board so it stays lively
-  if (Math.random() < 0.5 && !isBusy(s)) refreshOffers(s);
+  // Casting windows close and fresh opportunities trickle in.
+  tickOffers(s);
 
   // A dormant franchise may resurface with a sequel offer.
   maybeOfferSequel(s);

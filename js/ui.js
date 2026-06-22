@@ -283,6 +283,7 @@ function roleCard(r) {
       <span>⭐ +${r.fameGain}</span>
       <span>🎭 +${r.skillGain}</span>
       <span>${r.category === 'tvshow' ? '📺 series' : '⏱️ ' + r.weeks + ' wk'}</span>
+      ${expiryChip(r)}
     </div>
     <div class="reqs muted small">
       <span>Needs acting ${r.skillReq}</span>
@@ -298,6 +299,15 @@ function roleCard(r) {
     () => act(negotiate(S, r.id)), !!r.negotiated));
   c.appendChild(row);
   return c;
+}
+
+// "Use it or lose it" pressure: how long this casting window stays open.
+function expiryChip(r) {
+  if (r.callback) return '<span class="exp-chip warm">📞 holding</span>';
+  const n = r.expires ?? 4;
+  if (n <= 1) return '<span class="exp-chip hot">⏳ closes this week</span>';
+  if (n <= 2) return `<span class="exp-chip warn">⏳ ${n} wks left</span>`;
+  return `<span class="exp-chip">⏳ ${n} wks</span>`;
 }
 
 function offTypeNote(r) {
