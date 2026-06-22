@@ -171,6 +171,7 @@ main {
   background: #2a2718; color: var(--gold2); border: 1px solid var(--gold);
   border-radius: 999px; padding: 2px 10px;
 }
+.badge.sequel { background: #1f2433; color: #9ec1ff; border-color: var(--accent); }
 .chance { font-weight: 700; font-size: 13px; }
 .chance.good { color: var(--good); }
 .chance.mid { color: var(--mid); }
@@ -219,6 +220,14 @@ main {
 .est-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 14px; }
 .est-row.good span:last-child { color: var(--good); font-weight: 700; }
 .est-row.bad span:last-child { color: var(--bad); font-weight: 700; }
+
+/* Career graph */
+.graph-box { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 8px; }
+.career-graph { width: 100%; height: 120px; display: block; }
+.graph-legend { display: flex; gap: 16px; margin-top: 6px; flex-wrap: wrap; }
+.graph-legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: middle; }
+.graph-legend .dot.gold { background: var(--gold); }
+.graph-legend .dot.accent { background: var(--accent); }
 
 /* Awards */
 .award-head { margin: 16px 0 6px; font-size: 14px; }
@@ -311,6 +320,7 @@ footer {
 .modal-ic { font-size: 48px; }
 .modal-card h2 { margin: 6px 0 2px; }
 .modal-list { text-align: left; margin: 16px 0; }
+.bid-list li { animation: fade .25s ease; }
 .modal-headline { font-weight: 700; font-size: 17px; margin: 8px 0 16px; }
 .modal-headline.good { color: var(--gold2); }
 .modal-text { color: var(--txt); line-height: 1.5; margin: 10px 0 18px; }

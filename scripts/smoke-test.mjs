@@ -6,7 +6,7 @@ import { DIFFICULTIES, GENRE_KEYS, makeRole, taxFor } from '../js/data.js';
 import {
   advanceWeek, audition, auditionChance, takeClass, network, rest, sideJob,
   extraWork, toggleAgent, writeScript, startProduction, isBusy, catchUp, quitSeries,
-  agentReady, negotiate, resolveChoice, buyAsset, ownedAssets,
+  agentReady, negotiate, resolveChoice, buyAsset, ownedAssets, pitchScript, careerTotals,
 } from '../js/engine.js';
 
 let failures = 0;
@@ -38,15 +38,15 @@ function playCareer(diffKey, weeks) {
       rest(s);
     } else if (!isBusy(s) && s.offers.length) {
       const cb = s.offers.find((o) => o.callback);
-      const ranked = [...s.offers].sort((a, b) => auditionChance(s, b) * b.pay - auditionChance(s, a) * a.pay);
-      const best = cb || ranked[0];
-      if (s.money < 1000) sideJob(s);
-      else if (best && auditionChance(s, best) > 0.25) audition(s, best.id);
-      else if (s.money > 1500 && s.energy >= 25 && Math.random() < 0.4) takeClass(s, 'acting');
+      const winnable = s.offers.filter((o) => auditionChance(s, o) > 0.15).sort((a, b) => b.pay - a.pay);
+      const best = cb || winnable[0] || [...s.offers].sort((a, b) => auditionChance(s, b) - auditionChance(s, a))[0];
+      if (s.money < 8000) sideJob(s);
+      else if (best && auditionChance(s, best) > 0.12) audition(s, best.id);
+      else if (s.money > 6000 && s.energy >= 25 && Math.random() < 0.4) takeClass(s, 'acting');
       else extraWork(s);
-    } else if (s.money < 600) {
+    } else if (s.money < 4000) {
       sideJob(s);
-    } else if (s.money > 800 && s.energy >= 25 && Math.random() < 0.4) {
+    } else if (s.money > 6000 && s.energy >= 25 && Math.random() < 0.4) {
       takeClass(s, 'acting');
     } else if (s.contacts.length && s.energy >= 10 && Math.random() < 0.3) {
       catchUp(s, s.contacts[Math.floor(Math.random() * s.contacts.length)].id);
@@ -55,11 +55,11 @@ function playCareer(diffKey, weeks) {
     }
 
     if (!s.hasAgent && s.fame >= 12) toggleAgent(s);
-    if (s.fame >= 10 && s.money > 1500 && s.energy >= 30 && Math.random() < 0.06) takeClass(s, 'writing');
-    if (s.fame >= 15 && s.money > 1500 && s.energy >= 30 && Math.random() < 0.06) takeClass(s, 'directing');
-    if (s.fame >= 25 && s.money > 2000 && s.energy >= 30 && Math.random() < 0.06) takeClass(s, 'producing');
+    if (s.fame >= 10 && s.money > 12000 && s.energy >= 30 && Math.random() < 0.06) takeClass(s, 'writing');
+    if (s.fame >= 15 && s.money > 12000 && s.energy >= 30 && Math.random() < 0.06) takeClass(s, 'directing');
+    if (s.fame >= 25 && s.money > 20000 && s.energy >= 30 && Math.random() < 0.06) takeClass(s, 'producing');
     if (s.writing >= 5 && Math.random() < 0.06) writeScript(s);
-    if (s.producing >= 5 && s.money > 35000 && !s.productions.length) {
+    if (s.producing >= 5 && s.money > 8000000 && !s.productions.length) {
       startProduction(s, { budgetKey: 'mid', scriptId: s.scripts[0]?.id || '', direct: s.directing >= 5 });
     }
     if (s.activeSeries && s.activeSeries.season >= 6 && Math.random() < 0.05) quitSeries(s);
@@ -136,17 +136,18 @@ function exerciseAwards(years) {
     if (s.energy < 22) { rest(s); advanceWeek(s); continue; }
     if (!isBusy(s) && s.offers.length) {
       const cb = s.offers.find((o) => o.callback);
-      const t = cb || [...s.offers].sort((a, b) => auditionChance(s, b) * b.pay - auditionChance(s, a) * a.pay)[0];
-      if (s.money < 1000) sideJob(s);
-      else if (t && auditionChance(s, t) > 0.25) audition(s, t.id);
-      else if (s.money > 1500 && s.energy >= 25) takeClass(s, 'acting');
+      const winnable = s.offers.filter((o) => auditionChance(s, o) > 0.15).sort((a, b) => b.pay - a.pay);
+      const t = cb || winnable[0] || [...s.offers].sort((a, b) => auditionChance(s, b) - auditionChance(s, a))[0];
+      if (s.money < 8000) sideJob(s);
+      else if (t && auditionChance(s, t) > 0.12) audition(s, t.id);
+      else if (s.money > 6000 && s.energy >= 25) takeClass(s, 'acting');
       else extraWork(s);
-    } else if (s.money < 600) { sideJob(s); }
-    else if (s.money > 1500 && s.energy >= 25 && Math.random() < 0.4) { takeClass(s, 'acting'); }
+    } else if (s.money < 4000) { sideJob(s); }
+    else if (s.money > 6000 && s.energy >= 25 && Math.random() < 0.4) { takeClass(s, 'acting'); }
     else if (!isBusy(s)) { network(s); } else { rest(s); }
-    if (s.fame >= 15 && s.money > 1500 && s.energy >= 30 && Math.random() < 0.05) takeClass(s, 'directing');
-    if (s.fame >= 25 && s.money > 2000 && s.energy >= 30 && Math.random() < 0.05) takeClass(s, 'producing');
-    if (s.producing >= 5 && s.money > 35000 && !s.productions.length) {
+    if (s.fame >= 15 && s.money > 12000 && s.energy >= 30 && Math.random() < 0.05) takeClass(s, 'directing');
+    if (s.fame >= 25 && s.money > 20000 && s.energy >= 30 && Math.random() < 0.05) takeClass(s, 'producing');
+    if (s.producing >= 5 && s.money > 8000000 && !s.productions.length) {
       startProduction(s, { budgetKey: 'mid', scriptId: '', direct: s.directing >= 5 });
     }
     advanceWeek(s);
@@ -229,9 +230,9 @@ assert(aw.milestones >= 6, `career milestones are completed over a long career (
 
   // Narrative choice: trigger one and resolve it cleanly.
   const cs = newGame('Decider', 'normal');
-  cs.fame = 45; cs.money = 40000; cs.reputation = 50;
+  cs.fame = 45; cs.money = 400000; cs.reputation = 50;
   let guard = 0;
-  while (!cs.pendingChoice && guard++ < 400) { cs.money = 40000; advanceWeek(cs); }
+  while (!cs.pendingChoice && guard++ < 400) { cs.money = 400000; advanceWeek(cs); }
   assert(!!cs.pendingChoice, 'a narrative dilemma can be triggered');
   if (cs.pendingChoice) {
     const r = resolveChoice(cs, 0);
@@ -262,12 +263,27 @@ assert(aw.milestones >= 6, `career milestones are completed over a long career (
 
   // Lifestyle assets: purchase, ownership, and ongoing upkeep.
   const s = newGame('Tycoon', 'normal');
-  s.money = 2000000;
+  s.money = 20000000;
   const r = buyAsset(s, 'mansion');
   assert(r.ok && ownedAssets(s).some((a) => a.key === 'mansion'), 'lifestyle assets can be purchased');
-  const before = s.money;
-  s.money = 2000000; advanceWeek(s);
-  assert(s.money < 2000000, 'asset upkeep is charged weekly');
+  s.money = 20000000; advanceWeek(s);
+  assert(s.money < 20000000, 'asset upkeep is charged weekly');
+}
+
+// 8) Script pitching + lifetime totals
+{
+  const s = newGame('Auteur', 'easy');
+  s.writing = 85; s.fame = 85; s.acting = 85; s.directing = 60; s.producing = 60; s.reputation = 75; s.money = 1e6;
+  let greenlit = false;
+  for (let k = 0; k < 15 && !greenlit; k++) {
+    s.energy = 100;
+    pitchScript(s, (s.scripts[0] || (writeScript(s), s.scripts[0])).id, { star: true, direct: true });
+    if (s.active && s.active.project) { greenlit = true; let g = 0; while (s.active && g++ < 20) { s.money = 1e6; advanceWeek(s); } }
+    else if (!s.scripts.length) writeScript(s);
+  }
+  assert(greenlit, 'a bankable auteur can pitch & greenlight a film with attachments');
+  const t = careerTotals(s);
+  assert(t.boxOffice > 0, `lifetime box office accrues from releases ($${Math.round(t.boxOffice).toLocaleString()})`);
 }
 
 console.log('');

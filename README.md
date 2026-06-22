@@ -76,6 +76,12 @@ Hit. Hits boost your fame and reputation; flops set you back. Great work also ma
 the credit a real awards contender. Long shoots also throw the occasional **on-set
 dilemma** (an extra take, your own stunt, an improv idea, friction with a co-star).
 
+**Release results.** When a project comes out, a **premiere screen** shows the
+actual results — **box office** for theatrical films, **viewership** for TV and
+streaming, plus the rating, your performance score, fame gained, and (for your own
+productions) the profit. Every credit in your filmography records its box
+office/viewership and reception, so your career history reads like a real résumé.
+
 **Starting out (the grind).** Without representation you only see **Open Calls** —
 smaller, lower-paid commercials, TV movies, and indie films. Every audition
 teaches you something — you gain a little acting craft win *or* lose. A near-miss
@@ -144,15 +150,22 @@ finale; you can also choose to leave the show at any time.
 and producing (which unlock as your fame grows).
 
 **Create your own work** in the Create tab once you've trained:
-- ✍️ **Write scripts** — sell them to studios, or produce them yourself. Each
-  script has a genre and sharpens your writing skill (you learn by doing).
-- 🎬 **Produce** films at micro / mid / blockbuster budgets. Box office depends
-  on script quality, your producing skill, and—if you also **direct**—your
-  directing skill. Each production also builds your affinity in its genre.
-- ⭐ **Star in your own film** — check "Star in it" to play the lead in a project
-  you write, direct, and produce. The full-auteur credit is eligible for Best
-  Actor, Director, Picture *and* Original Screenplay, and you can rehearse it
-  like any role.
+- ✍️ **Write scripts** — each has a genre and sharpens your writing skill.
+- 📣 **Pitch scripts to studios** — choose what to **attach yourself as** (Star /
+  Director / Producer, gated by skill & fame). Studios may **pass**, make a
+  **single offer**, or — for a hot script and a bankable name — spark a **bidding
+  war** (shown in a live reveal as studios escalate their bids) that drives the
+  price into the millions. A writer-only pitch is a clean
+  sale; attach creative roles and the studio greenlights the film with you in it,
+  which then films and **releases** (box office, reception, residuals, a credit
+  with every hat you wore). Attaching an unbankable you scares studios off.
+- 🎬 **Produce your own** films at micro / mid / blockbuster budgets (your own
+  studio), optionally **directing** and **starring** — full control, you keep the
+  box office.
+
+Salaries scale with your **fame "quote"** (a newcomer earns the baseline; an icon
+commands ~10× for the same role), a hit TV show's per-season fee **explodes** on
+renewal (negotiable), and your past hits pay **decaying royalties** for years.
 
 **Awards season** runs through the calendar with four real ceremonies, each
 judging your eligible credits from the trailing year:
@@ -177,6 +190,52 @@ honored project celebrate with you, deepening those relationships. **Best Origin
 open to films you write — both screenplays you sell to studios and your own
 self-produced projects.
 
+## The long game
+
+A career plays out over decades, and these systems shape its full arc:
+
+**Aging & the career arc.** Every year you get older, and age changes the game.
+Your career moves through phases — **Rising → In Their Prime → Veteran → Elder
+Statesman** — shown on the Career page. Past 50 your **stamina** tapers (lower
+max energy), leading roles get harder to land once you're past 45 (unless you're
+a huge star), and if you go quiet your **fame fades** faster the older you are.
+Staying relevant late means choosing your projects well.
+
+**Health & wellness.** A new **❤️ Health** stat (0–100) governs how fast your
+energy recovers — run yourself ragged (chronically low energy) and your health
+erodes, which slows recovery further and dents your audition odds. Spend on a
+**🧘 Wellness** retreat to restore health and energy. Health also declines slowly
+with age, so veterans have to manage it.
+
+**Agent, manager & publicist tiers.** Representation is now a real ladder. Sign
+with an agent tier — **Boutique → Established → Powerhouse** — each unlocking more
+(and better) offers and bigger audition pull, for a steeper cut. Add a **manager**
+(small cut, sharpens negotiations) and a **publicist** (weekly retainer that
+softens scandals and amplifies good press). Manage all of it on the **People** tab.
+
+**Endorsements & social media.** Build a **fanbase**: 📣 **post on social** to
+grow followers (with a chance to go viral), and once you're known, **brand deals**
+roll in — recurring endorsement income on the new **Press** tab. Followers drift
+toward your fame over time, and overexposure can nick your reputation.
+
+**Franchises & a release calendar.** A breakout film (a true smash) can become a
+**franchise**: months later the studio offers you a **sequel** — premium pay and
+built-in audience, flagged on the casting board — at the cost of deepening your
+typecast. Franchises fatigue with each installment and eventually run their
+course (tracked on the Career page). And no film opens in a vacuum: releasing
+**against a rival blockbuster** can take a bite out of your box office, shown on
+the premiere screen.
+
+**Festivals & critic-vs-audience scores.** Every release now gets a **🍅 Critics**
+and **🍿 Audience** score (critics reward craft and prestige; audiences reward
+broad appeal and star power). Four real **film festivals** — Sundance, Cannes,
+Venice, TIFF — anoint your recent acclaimed work through the year, boosting
+prestige, reputation, and fame.
+
+**Career stats & graphs.** The Career page charts your **fame and net worth over
+time** on a trajectory graph, alongside lifetime box office, total viewership,
+career prestige, and your full filmography with every score.
+
 ## Retirement & the Hall of Fame
 
 Careers don't run forever. From the **Career** tab you can **retire** at any time
@@ -189,7 +248,9 @@ reputation, then ranks you in the **Hall of Fame**:
 🏆 Hollywood Legend → 👑 Immortal Icon
 
 A sufficiently storied career is honored with a **🎖️ Lifetime Achievement Award**.
-The ending screen shows a full legacy scorecard.
+The ending screen shows a full legacy scorecard, including your **lifetime box
+office** and **total viewership** across everything you ever appeared in (also
+shown on the Career page).
 
 **Watch the money.** Weekly living costs never stop. Go broke and your career
 ends — work side jobs to stay afloat between gigs.
