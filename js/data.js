@@ -476,6 +476,14 @@ export const CEREMONIES = [
   },
 ];
 
+// Film festivals — prestige events that anoint indie/documentary work mid-year.
+export const FESTIVALS = [
+  { key: 'sundance', name: 'Sundance', icon: '⛰️', week: 4 },
+  { key: 'cannes', name: 'Cannes', icon: '🌴', week: 20 },
+  { key: 'venice', name: 'Venice', icon: '🦁', week: 35 },
+  { key: 'tiff', name: 'Toronto (TIFF)', icon: '🍁', week: 37 },
+];
+
 // Map a filmography credit's category label to an awards medium.
 export function creditMedium(category) {
   if (['Indie Film', 'Studio Film', 'Streaming Film', 'Documentary', 'Produced'].includes(category)) return 'film';

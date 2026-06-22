@@ -1,7 +1,7 @@
 // engine.js — core game mechanics
 import {
   WEEKS_PER_YEAR, AGENT_CUT, CLASSES, EVENTS,
-  DIFFICULTIES, GENRES, GENRE_KEYS, CEREMONIES, creditMedium,
+  DIFFICULTIES, GENRES, GENRE_KEYS, CEREMONIES, FESTIVALS, creditMedium,
   HALL_OF_FAME, LIFETIME_ACHIEVEMENT_MIN, MILESTONES, CHOICE_EVENTS,
   ASSETS, taxFor, CATEGORIES, fameQuote, STUDIOS, BRANDS,
   AGENT_TIERS, PUBLICIST_FEE, MANAGER_CUT,
@@ -882,7 +882,8 @@ function wrapStudioProject(s, a) {
   if (at.produce) base += s.producing * 0.1;
   const quality = clamp(Math.round(base * rf(0.8, 1.15)), 5, 100);
   const rec = reception(quality);
-  const result = projectResult('Studio Film', 2, quality, s.fame);
+  const sc = scoreRelease(quality, s.fame, a.role.prestige);
+  const result = projectResult('Studio Film', 2, sc.audience, s.fame);
   bondWithCostars(s, a.costars || []);
   const fameGain = +(a.role.fameGain * rec.fameMult).toFixed(1);
   gainFame(s, fameGain);
@@ -898,12 +899,14 @@ function wrapStudioProject(s, a) {
     acted: !!at.star, billing: at.star ? 'lead' : undefined, lead: !!at.star,
     directed: !!at.direct, produced: !!at.produce, written: true, writeQuality: a.scriptQuality,
     costars: (a.costars || []).map((c) => c.id), quality, reception: rec.label, result,
+    critics: sc.critics, audience: sc.audience,
   });
   grantRoyalty(s, a.role.title, result, at.star ? 'lead' : 'supporting');
-  pushLog(s, `🎞️ Your film "${a.role.title}" released — ${rec.emoji} ${rec.label} (quality ${quality}). +${fameGain} fame.`);
+  pushLog(s, `🎞️ Your film "${a.role.title}" released — ${rec.emoji} ${rec.label} (🍅 ${sc.critics} / 🍿 ${sc.audience}). +${fameGain} fame.`);
   s.releaseNight = {
     title: a.role.title, icon: a.role.genreIcon, category: 'Your Studio Film', role: roles,
     genre: a.role.genreName, quality, reception: rec.label, emoji: rec.emoji,
+    critics: sc.critics, audience: sc.audience,
     result, fameGain, costars: (a.costars || []).map((c) => c.name),
   };
   s.active = null;
@@ -997,6 +1000,15 @@ function performanceQuality(s, role, prep) {
   return clamp(Math.round(base * rf(0.82, 1.15)), 5, 100);
 }
 
+// Rotten-Tomatoes-style split: critics reward craft & prestige; audiences reward
+// broad appeal & star power. Derived from the work's quality so they track it.
+function scoreRelease(quality, fame, prestige) {
+  return {
+    critics: Math.round(clamp(quality * 0.85 + (prestige || 0) * 6 + rf(-7, 7), 1, 100)),
+    audience: Math.round(clamp(quality * 0.6 + fame * 0.2 + rf(-10, 12), 1, 100)),
+  };
+}
+
 // How the work lands with audiences/critics, from its quality (+ luck).
 function reception(quality) {
   const score = quality + rf(-12, 12);
@@ -1066,6 +1078,7 @@ function wrapProduction(s, prod) {
   }
 
   const rec = reception(q);
+  const sc = scoreRelease(q, s.fame, prod.scale * 0.3);
   addCredit(s, {
     title: prod.title, category: 'Produced', genre: prod.genreName,
     role: [prod.star ? 'Star' : null, prod.directed ? 'Director' : null, 'Producer', prod.written ? 'Writer' : null].filter(Boolean).join(' / '),
@@ -1073,17 +1086,19 @@ function wrapProduction(s, prod) {
     acted: !!prod.star, billing: prod.star ? 'lead' : undefined, lead: !!prod.star,
     costars: (prod.costars || []).map((c) => c.id),
     writeQuality: prod.scriptQuality, quality: Math.round(q),
+    critics: sc.critics, audience: sc.audience,
     reception: rec.label, result: { type: 'box', value: gross },
   });
 
   const verdict = profit > 0
     ? `It grossed $${gross.toLocaleString()} — a $${profit.toLocaleString()} profit! 🍾`
     : `It grossed $${gross.toLocaleString()} — a $${Math.abs(profit).toLocaleString()} loss. 📉`;
-  pushLog(s, `🎞️ "${prod.title}" wrapped (${rec.emoji} ${rec.label}, quality ${Math.round(q)}). ${verdict} +${fameGain} fame.`);
+  pushLog(s, `🎞️ "${prod.title}" wrapped (${rec.emoji} ${rec.label}, 🍅 ${sc.critics} / 🍿 ${sc.audience}). ${verdict} +${fameGain} fame.`);
   s.releaseNight = {
     title: prod.title, icon: prod.genreIcon || '🎬', category: 'Your Production',
     role: [prod.star ? 'Star' : null, prod.directed ? 'Director' : null, 'Producer'].filter(Boolean).join(' / '),
     genre: prod.genreName, quality: Math.round(q), reception: rec.label, emoji: rec.emoji,
+    critics: sc.critics, audience: sc.audience,
     result: { type: 'box', value: gross }, profit, fameGain,
     costars: (prod.costars || []).map((c) => c.name),
   };
@@ -1184,7 +1199,10 @@ function judgeCategory(s, credit, cat, cer) {
     : cat.kind === 'producing' ? s.producing
       : cat.kind === 'writing' ? s.writing : s.acting;
   // Writing is judged on the screenplay's quality, not the finished film's.
-  const workQuality = cat.kind === 'writing' ? (credit.writeQuality ?? credit.quality ?? 40) : (credit.quality ?? 40);
+  // Critics drive awards (a prestige beat); writing uses the screenplay quality.
+  const workQuality = cat.kind === 'writing'
+    ? (credit.writeQuality ?? credit.quality ?? 40)
+    : (credit.critics ?? credit.quality ?? 40);
   // Campaign strength ~0..100: work quality dominates, with craft, reputation
   // (industry respect/campaigning) and fame contributing.
   const strength = workQuality * 0.55 + craft * 0.25 + s.reputation * 0.12 + s.fame * 0.08;
@@ -1198,6 +1216,24 @@ function judgeCategory(s, credit, cat, cer) {
   const edge = clamp((strength - bar) / 70, 0, 0.30);
   const winChance = clamp(0.12 + edge, 0.06, 0.42);
   return { nominated: true, won: Math.random() < winChance };
+}
+
+// Festivals: a critically-strong recent indie/documentary (or any film) earns a
+// selection — and, if exceptional, the top prize — boosting prestige, rep & fame.
+function runFestival(s, fest) {
+  const now = absWeek(s);
+  const pool = s.filmography.filter((c) => c.wk != null && c.wk > now - WEEKS_PER_YEAR && c.wk <= now
+    && c.medium === 'film' && (c.critics ?? 0) >= 55);
+  if (!pool.length) return;
+  const best = pool.reduce((a, b) => ((b.critics ?? 0) > (a.critics ?? 0) ? b : a));
+  const won = (best.critics ?? 0) >= 80 && Math.random() < 0.5;
+  const prestige = +((best.critics ?? 60) / 100 * (won ? 2.2 : 1)).toFixed(2);
+  s.careerPrestige += prestige;
+  s.reputation = clamp(s.reputation + (won ? 6 : 3), 0, 100);
+  gainFame(s, won ? 3 : 1.5);
+  pushLog(s, won
+    ? `${fest.icon} "${best.title}" WON the top prize at ${fest.name}! A festival sensation.`
+    : `${fest.icon} "${best.title}" was selected at ${fest.name} — critical buzz builds.`);
 }
 
 function runCeremony(s, cer) {
@@ -1351,6 +1387,7 @@ export function advanceWeek(s) {
       const quality = performanceQuality(s, a.role, a.prep);
       const isAd = creditMedium(a.role.catName) === 'other'; // commercials: no box office
       const rec = isAd ? null : reception(quality);
+      const sc = isAd ? null : scoreRelease(quality, s.fame, a.role.prestige);
       const fameGain = +(a.role.fameGain * (rec ? rec.fameMult : 1) + rubOff).toFixed(1);
       gainFame(s, fameGain);
       s.acting = clamp(+(s.acting + a.role.skillGain).toFixed(1), 0, 100);
@@ -1364,17 +1401,19 @@ export function advanceWeek(s) {
         lead: a.role.billing === 'lead',
         costars: (a.costars || []).map((c) => c.id),
         quality, reception: rec ? rec.label : undefined,
-        result: isAd ? null : projectResult(a.role.catName, a.role.tier, quality, s.fame),
+        critics: sc ? sc.critics : undefined, audience: sc ? sc.audience : undefined,
+        result: isAd ? null : projectResult(a.role.catName, a.role.tier, sc.audience, s.fame),
       });
       const cred = s.filmography[s.filmography.length - 1];
       if (!isAd) grantRoyalty(s, a.role.title, cred.result, a.role.billing);
-      const recMsg = rec ? ` ${rec.emoji} ${rec.label} (quality ${quality}).` : '';
+      const recMsg = rec ? ` ${rec.emoji} ${rec.label} (🍅 ${sc.critics} / 🍿 ${sc.audience}).` : '';
       pushLog(s, `🎉 "${a.role.title}" wrapped!${recMsg} +${fameGain} fame, +${a.role.skillGain} acting.`);
       if (!isAd) {
         s.releaseNight = {
           title: a.role.title, icon: a.role.genreIcon, category: a.role.catName,
           role: a.role.part, billing: a.role.billing, genre: a.role.genreName,
           quality, reception: rec.label, emoji: rec.emoji, result: cred.result,
+          critics: sc.critics, audience: sc.audience,
           fameGain, costars: (a.costars || []).map((c) => c.name),
         };
       }
@@ -1443,6 +1482,10 @@ export function advanceWeek(s) {
   // Awards season: ceremonies fall on specific weeks through the year.
   for (const cer of CEREMONIES) {
     if (s.week === cer.week) runCeremony(s, cer);
+  }
+  // Film festivals anoint your recent indie/prestige work.
+  for (const fest of FESTIVALS) {
+    if (s.week === fest.week) runFestival(s, fest);
   }
 
   // Career milestones (passive completions: fame/money thresholds, awards, etc.)

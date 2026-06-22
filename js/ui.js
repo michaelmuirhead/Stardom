@@ -760,8 +760,9 @@ function careerView() {
     const ul = el('ul', 'list');
     for (const f of [...S.filmography].reverse()) {
       const rec = f.reception ? ` <span class="muted small">· ${f.reception}</span>` : '';
+      const rt = f.critics != null ? ` <span class="muted small">· 🍅${f.critics} 🍿${f.audience}</span>` : '';
       const res = f.result ? ` <span class="muted small">· ${resultText(f.result)}</span>` : '';
-      ul.appendChild(el('li', null, `<b>${f.title}</b> — ${f.role} <span class="muted">(${f.genre ? f.genre + ' ' : ''}${f.category}, Yr ${f.year})</span>${f.quality != null ? ` <span class="qchip">★ ${f.quality}</span>` : ''}${rec}${res}`));
+      ul.appendChild(el('li', null, `<b>${f.title}</b> — ${f.role} <span class="muted">(${f.genre ? f.genre + ' ' : ''}${f.category}, Yr ${f.year})</span>${f.quality != null ? ` <span class="qchip">★ ${f.quality}</span>` : ''}${rec}${rt}${res}`));
     }
     wrap.appendChild(ul);
   }
@@ -918,6 +919,7 @@ function buildReleaseModal() {
   const row = (lab, val, cls) => `<div class="est-row ${cls || ''}"><span>${lab}</span><span>${val}</span></div>`;
   let html = '';
   if (r.result) html += row(r.result.type === 'box' ? 'Box office' : 'Viewership', resultText(r.result));
+  if (r.critics != null) html += row('🍅 Critics / 🍿 Audience', `${r.critics}% / ${r.audience}%`);
   if (r.rating != null) html += row('Rating', `${r.rating}/100`);
   if (r.quality != null) html += row('Your performance', `${r.quality}/100`);
   if (r.profit != null) html += row('Profit', `${r.profit >= 0 ? '+' : ''}${money(r.profit)}`, r.profit >= 0 ? 'good' : 'bad');
