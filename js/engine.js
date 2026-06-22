@@ -3,7 +3,7 @@ import {
   WEEKS_PER_YEAR, AGENT_CUT, CLASSES, EVENTS,
   DIFFICULTIES, GENRES, GENRE_KEYS, CEREMONIES, creditMedium,
   HALL_OF_FAME, LIFETIME_ACHIEVEMENT_MIN, MILESTONES, CHOICE_EVENTS,
-  ASSETS, taxFor, CATEGORIES, fameQuote, STUDIOS,
+  ASSETS, taxFor, CATEGORIES, fameQuote, STUDIOS, BRANDS,
   AGENT_TIERS, PUBLICIST_FEE, MANAGER_CUT,
   projectTitle, makeRole, makeCostar, makeRival,
 } from './data.js';
@@ -692,6 +692,66 @@ export function toggleAgent(s) {
   return signAgent(s, best.key);
 }
 
+// ---- Social media & endorsements ------------------------------------------
+// Post to your fanbase: builds followers & a little fame; can go viral.
+export function socialPost(s) {
+  if (s.gameOver) return { ok: false, msg: 'The game is over.' };
+  if (s.energy < 8) return { ok: false, msg: 'Too tired to post.' };
+  spendEnergy(s, 8);
+  let gained = rf(0.15, 0.7) * (1 + s.fame / 60) * (s.publicist ? 1.3 : 1);
+  let fameUp = rf(0.1, 0.4);
+  const viral = Math.random() < (0.08 + (s.publicist ? 0.04 : 0));
+  if (viral) { gained *= 5; fameUp *= 4; }
+  s.followers = +((s.followers || 0) + gained).toFixed(2);
+  gainFame(s, fameUp);
+  pushLog(s, viral
+    ? `📈 Your post went VIRAL! +${gained.toFixed(1)}M followers.`
+    : `📱 You posted for your fans. +${gained.toFixed(2)}M followers.`);
+  return { ok: true, msg: viral ? 'Went viral!' : 'Posted.' };
+}
+
+function makeBrandOffer(s) {
+  const weeks = [12, 26, 52][Math.floor(Math.random() * 3)];
+  const weekly = Math.round((s.fame * 220 + (s.followers || 0) * 9000) * rf(0.7, 1.4) * (s.publicist ? 1.15 : 1));
+  return {
+    id: 'bd' + Math.random().toString(36).slice(2, 8),
+    brand: BRANDS[Math.floor(Math.random() * BRANDS.length)],
+    weeks, weekly, fame: +rf(0.5, 2).toFixed(1),
+  };
+}
+
+export function refreshBrandOffers(s) {
+  if (s.fame < 8) { s.brandOffers = []; return; }
+  const n = 1 + Math.floor(Math.random() * 3);
+  s.brandOffers = Array.from({ length: n }, () => makeBrandOffer(s));
+}
+
+export function acceptBrandDeal(s, id) {
+  if (s.gameOver) return { ok: false, msg: 'The game is over.' };
+  const i = (s.brandOffers || []).findIndex((o) => o.id === id);
+  if (i < 0) return { ok: false, msg: 'That offer is gone.' };
+  const o = s.brandOffers[i];
+  if (!s.endorsements) s.endorsements = [];
+  s.endorsements.push({ brand: o.brand, weekly: o.weekly, weeksLeft: o.weeks });
+  s.brandOffers.splice(i, 1);
+  gainFame(s, o.fame);
+  pushLog(s, `🤝 Signed a ${o.brand} endorsement — $${o.weekly.toLocaleString()}/wk for ${o.weeks} weeks.`);
+  return { ok: true, msg: `Endorsing ${o.brand}.` };
+}
+
+// Weekly: pay endorsements, age the fanbase toward your fame, refresh offers.
+function tickSocial(s) {
+  if (s.endorsements && s.endorsements.length) {
+    for (const e of s.endorsements) { earn(s, e.weekly); e.weeksLeft--; }
+    s.endorsements = s.endorsements.filter((e) => e.weeksLeft > 0);
+    const over = s.endorsements.length - 1;          // overexposure beyond one deal
+    if (over > 0) s.reputation = clamp(s.reputation - over * 0.4, 0, 100);
+  }
+  const target = s.fame * 0.45;                       // fanbase trends toward fame
+  s.followers = +Math.max(0, (s.followers || 0) + (target - (s.followers || 0)) * 0.04).toFixed(2);
+  if (Math.random() < 0.15) refreshBrandOffers(s);
+}
+
 // ---- Writing / Producing / Directing --------------------------------------
 export function writeScript(s) {
   if (s.gameOver) return { ok: false, msg: 'The game is over.' };
@@ -1271,6 +1331,9 @@ export function advanceWeek(s) {
 
   // Residual income from past hits
   payRoyalties(s);
+
+  // Endorsements & fanbase
+  tickSocial(s);
 
   // Active acting role progresses
   if (s.active) {

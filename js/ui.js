@@ -10,6 +10,7 @@ import {
   retire, careerLegacy, careerTotals, checkMilestones, typecastInfo, negotiate, resolveChoice,
   buyAsset, ownedAssets, prepareRole, negotiateRenewal,
   signAgent, dropAgent, toggleStaff, agentTierInfo, agentTierReady,
+  socialPost, acceptBrandDeal, refreshBrandOffers,
 } from './engine.js';
 
 let S = null;        // current game state
@@ -192,6 +193,7 @@ const TABS = [
   ['goals', '🎯 Goals'],
   ['train', '📚 Train'],
   ['create', '🎬 Create'],
+  ['press', '📣 Press'],
   ['finances', '💰 Finances'],
   ['people', '👥 People'],
   ['career', '👤 Career'],
@@ -215,6 +217,7 @@ function renderPanel() {
   else if (activeTab === 'goals') p.appendChild(goalsView());
   else if (activeTab === 'train') p.appendChild(trainView());
   else if (activeTab === 'create') p.appendChild(createView());
+  else if (activeTab === 'press') p.appendChild(pressView());
   else if (activeTab === 'finances') p.appendChild(financesView());
   else if (activeTab === 'people') p.appendChild(peopleView());
   else if (activeTab === 'career') p.appendChild(careerView());
@@ -497,6 +500,51 @@ function goalCard(m, complete) {
     <div class="muted small">${m.desc}</div></div></div>
     ${reward ? `<div class="muted small">Reward: ${reward}${complete && S.milestonesDone[m.key] ? ` · <span class="good">done Yr ${S.milestonesDone[m.key]}</span>` : ''}</div>` : ''}`;
   return card;
+}
+
+// ---- Press view (social media & endorsements) ------------------------------
+function pressView() {
+  const wrap = el('div', 'view');
+  wrap.appendChild(el('h2', null, `📣 Press & Social — ${(S.followers || 0).toFixed(1)}M followers`));
+
+  const social = el('div', 'panel-block');
+  social.appendChild(el('p', 'muted small', 'Post to grow your fanbase and fame — bigger fame means bigger posts, and posts can go viral. Your following also drives brand-deal value.'));
+  social.appendChild(actionBtn('📱 Post to fans (8⚡)', () => act(socialPost(S)), S.energy < 8));
+  wrap.appendChild(social);
+
+  // Active endorsements
+  const act_ = S.endorsements || [];
+  if (act_.length) {
+    const total = act_.reduce((t, e) => t + e.weekly, 0);
+    wrap.appendChild(el('h3', null, `🤝 Active Endorsements — ${bigMoney(total)}/wk`));
+    const ul = el('ul', 'list');
+    for (const e of act_) ul.appendChild(el('li', null, `<b>${e.brand}</b> <span class="muted">— ${bigMoney(e.weekly)}/wk · ${e.weeksLeft} wk left</span>`));
+    wrap.appendChild(ul);
+    if (act_.length > 1) wrap.appendChild(el('p', 'bad small', '⚠️ Over-exposure: juggling multiple deals chips at your reputation.'));
+  }
+
+  // Brand offers
+  wrap.appendChild(el('h3', null, '💼 Brand Deals'));
+  if (S.fame < 8) {
+    wrap.appendChild(el('p', 'muted', 'No brands want you yet — build some fame first.'));
+    return wrap;
+  }
+  if (!S.brandOffers || !S.brandOffers.length) {
+    wrap.appendChild(el('p', 'muted', 'No offers on the table right now.'));
+    wrap.appendChild(actionBtn('🔄 Reach out to brands', () => { refreshBrandOffers(S); act({ ok: true, msg: 'Reached out to brands.' }); }));
+    return wrap;
+  }
+  const grid = el('div', 'grid');
+  for (const o of S.brandOffers) {
+    const card = el('div', 'card');
+    card.innerHTML = `<div class="card-title">🏷️ ${o.brand}</div>
+      <div class="reqs small"><span>${bigMoney(o.weekly)}/wk</span><span>${o.weeks} wk</span><span>⭐ +${o.fame}</span></div>
+      <div class="muted small">Total ~${bigMoney(o.weekly * o.weeks)}</div>`;
+    card.appendChild(actionBtn('Sign deal', () => act(acceptBrandDeal(S, o.id))));
+    grid.appendChild(card);
+  }
+  wrap.appendChild(grid);
+  return wrap;
 }
 
 // ---- Finances view (income, taxes, lifestyle assets) -----------------------

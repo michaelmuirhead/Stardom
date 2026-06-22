@@ -27,6 +27,9 @@ export function newGame(playerName, difficultyKey) {
     filmography: [],     // completed credits {title, category, year, role}
     awards: [],          // {name, year, project}
 
+    followers: 0,        // social media fanbase (millions)
+    endorsements: [],    // active brand deals
+    brandOffers: [],     // available brand-deal offers
     genres: Object.fromEntries(GENRE_KEYS.map((k) => [k, 0])), // affinity XP
     contacts: [],        // co-stars & industry relationships
     partner: null,       // current romantic partner (contact id)

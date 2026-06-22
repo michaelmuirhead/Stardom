@@ -156,6 +156,9 @@ export const LAST_NAMES = ['Vance', 'Cross', 'Marlowe', 'Sterling', 'Quinn', 'Fr
 export const STUDIOS = ['Apex Pictures', 'Meridian Studios', 'Lumen Films', 'Vanguard Pictures',
   'Nova Entertainment', 'Atlas Films', 'Silverpeak Studios', 'Onyx Pictures', 'Crown & Co.', 'Halcyon Media'];
 
+export const BRANDS = ['Aurora Phones', 'Velocity Motors', 'PureGlow Skincare', 'Monarch Watches',
+  'Lumière Couture', 'Apex Athletics', 'Nova Cosmetics', 'Crest Airlines', 'GildedAir', 'Sparkle Soda'];
+
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const ri = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 const rf = (a, b) => a + Math.random() * (b - a);
