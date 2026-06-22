@@ -7,6 +7,7 @@ import {
   advanceWeek, audition, auditionChance, takeClass, network, rest, sideJob,
   extraWork, toggleAgent, writeScript, startProduction, isBusy, catchUp, quitSeries,
   agentReady, negotiate, resolveChoice, buyAsset, ownedAssets, pitchScript, careerTotals,
+  startAudition, auditionChoose, currentAuditionBeat, closeAudition,
 } from '../js/engine.js';
 
 let failures = 0;
@@ -102,6 +103,40 @@ function exerciseEarly() {
   // Pre-agent, the board must only show open-call roles.
   const preAgentBoardOk = !s.hasAgent ? s.offers.every((o) => o.openCall) : true;
   return { callbacks, auditioned, preAgentBoardOk, hasAgent: s.hasAgent };
+}
+
+// Play interactive audition scenes to completion; confirm they resolve, track a
+// director, and let craft sway the outcome (a skilled actor outperforms a raw one).
+function exerciseAuditionScenes() {
+  function rate(acting, fame) {
+    let landed = 0, resolved = 0, dirTracked = 0, n = 300;
+    for (let run = 0; run < n; run++) {
+      const s = newGame('Reader', 'normal');
+      s.acting = acting; s.fame = fame; s.energy = 100;
+      const role = s.offers.find((o) => o.billing !== 'lead') || s.offers[0];
+      const r0 = startAudition(s, role.id);
+      if (!r0.ok) continue;
+      let guard = 0;
+      while (s.auditionScene && !s.auditionScene.done && guard++ < 8) {
+        const beat = currentAuditionBeat(s);
+        // "Competent" play: grounded read, take the note, build rapport.
+        const want = ['true', 'take', 'chat'];
+        const key = beat.choices.find((c) => want.includes(c.key)) ? want.find((w) => beat.choices.some((c) => c.key === w)) : beat.choices[0].key;
+        auditionChoose(s, key);
+      }
+      if (s.auditionScene && s.auditionScene.done) {
+        resolved++;
+        if (s.auditionScene.verdict.won) landed++;
+        if (s.directors.length) dirTracked++;
+        closeAudition(s);
+      }
+      assert(s.auditionScene == null, 'audition scene clears after close');
+    }
+    return { landed: landed / n, resolved, dirTracked };
+  }
+  const raw = rate(10, 5);
+  const skilled = rate(55, 35);
+  return { raw, skilled };
 }
 
 // Deterministically join TV series and run them to observe renewals + cancels.
@@ -201,6 +236,13 @@ const early = exerciseEarly();
 console.log(`  early burst: ${early.auditioned} auditions, ${early.callbacks} callbacks`);
 assert(early.callbacks > 0, 'audition callbacks occurred in early-game burst');
 assert(early.preAgentBoardOk, 'pre-agent board only shows open-call roles');
+
+// 4b) Played audition scenes resolve cleanly and reward craft.
+const scenes = exerciseAuditionScenes();
+console.log(`  audition scenes: raw actor books ${(scenes.raw.landed * 100).toFixed(0)}%, skilled books ${(scenes.skilled.landed * 100).toFixed(0)}%`);
+assert(scenes.raw.resolved > 0 && scenes.skilled.resolved > 0, 'played audition scenes resolve to a verdict');
+assert(scenes.skilled.dirTracked > 0, 'auditions record the director you read for');
+assert(scenes.skilled.landed > scenes.raw.landed + 0.2, 'craft meaningfully improves audition outcomes');
 
 // 5) Awards season fires and produces realistic (non-runaway) outcomes
 const YEARS = 15;

@@ -5,6 +5,7 @@ import {
 } from './data.js';
 import {
   audition, auditionChance, takeClass, network, rest, sideJob, extraWork, toggleAgent, wellness, agePhase,
+  startAudition, auditionChoose, closeAudition, currentAuditionBeat,
   writeScript, pitchScript, startProduction, estimateProduction, advanceWeek, isBusy, BUDGET_TIERS,
   catchUp, quitSeries, specialty, diffOf, agentReady, AGENT_FAME_REQ, AGENT_CREDITS_REQ,
   retire, careerLegacy, careerTotals, checkMilestones, typecastInfo, negotiate, resolveChoice,
@@ -292,7 +293,7 @@ function roleCard(r) {
     ${r.negotiated === 'down' ? '<div class="bad small">😬 Casting cooled after a failed negotiation.</div>' : ''}`;
   const row = el('div', 'card-actions');
   row.appendChild(actionBtn(r.callback ? '🎟️ Callback audition (18⚡)' : '🎟️ Audition (18⚡)',
-    () => act(audition(S, r.id)), S.energy < 18));
+    () => act(startAudition(S, r.id)), S.energy < 18));
   row.appendChild(actionBtn(r.negotiated ? '🤝 Negotiated' : '🤝 Negotiate',
     () => act(negotiate(S, r.id)), !!r.negotiated));
   c.appendChild(row);
@@ -915,7 +916,8 @@ function renderModals() {
   const existing = document.querySelector('#modal');
   if (existing) existing.remove();
   if (S.gameOver) return;
-  if (S.pitchNight) buildPitchModal();
+  if (S.auditionScene) buildAuditionModal();
+  else if (S.pitchNight) buildPitchModal();
   else if (S.releaseNight) buildReleaseModal();
   else if (S.ceremonyNight) buildCeremonyModal();
   else if (S.pendingChoice) buildChoiceModal();
@@ -1049,6 +1051,65 @@ function buildCeremonyModal() {
   card.appendChild(btn);
 }
 
+// ---- Played audition scene -------------------------------------------------
+function buildAuditionModal() {
+  const sc = S.auditionScene;
+  const { overlay, card } = modalShell();
+  const role = sc.role;
+  card.appendChild(el('div', 'modal-ic', role.genreIcon || '🎟️'));
+  card.appendChild(el('h2', null, `Audition — "${role.title}"`));
+  card.appendChild(el('p', 'muted small',
+    `${role.genreIcon} ${role.genreName} ${role.catName} · ${role.part} · with ${sc.director.name}${sc.director.films ? ` (you've worked together ${sc.director.films}×)` : ''}`));
+
+  // Running transcript of how the read has gone so far.
+  if (sc.chosen.length) {
+    const log = el('div', 'aud-log');
+    for (const c of sc.chosen) {
+      log.appendChild(el('div', `aud-line ${c.tier}`, `<span class="aud-choice">${c.a}</span><span class="aud-beat">${c.line}</span>`));
+    }
+    card.appendChild(log);
+  }
+
+  if (sc.done) {
+    const v = sc.verdict;
+    const headline = v.won ? '✅ You booked it!' : v.callback ? '📞 Callback — they want to see you again' : '❌ Not this time';
+    card.appendChild(el('p', `modal-headline ${v.won ? 'good' : v.callback ? '' : 'bad'}`, headline));
+    const modTxt = v.mod >= 0 ? `+${Math.round(v.mod * 100)}%` : `${Math.round(v.mod * 100)}%`;
+    card.appendChild(el('p', 'muted small',
+      `Your read shifted the odds ${modTxt} (to ${Math.round(v.finalChance * 100)}%). ` +
+      `${sc.director.name}'s read on you: ${dirRelLabel(sc.director.rel)}. +${v.learn} acting.`));
+    const cont = actionBtn('Continue', () => { closeAudition(S); if (onMutate) onMutate(S); overlay.remove(); render(); });
+    cont.classList.add('primary');
+    card.appendChild(cont);
+    return;
+  }
+
+  const beat = currentAuditionBeat(S);
+  card.appendChild(el('p', 'aud-prompt', beat.speak));
+  card.appendChild(el('p', 'muted small', `Beat ${beat.index + 1} of ${beat.total} · ${beat.title}`));
+  const opts = el('div', 'choice-opts');
+  for (const ch of beat.choices) {
+    const b = el('button', 'btn choice-btn', ch.label);
+    b.disabled = ch.disabled;
+    b.onclick = () => {
+      auditionChoose(S, ch.key);
+      if (onMutate) onMutate(S);
+      overlay.remove();
+      render(); // re-renders the modal for the next beat or the verdict
+    };
+    opts.appendChild(b);
+  }
+  card.appendChild(opts);
+}
+
+function dirRelLabel(rel) {
+  if (rel >= 80) return '🌟 a champion of yours';
+  if (rel >= 65) return '😊 warm on you';
+  if (rel >= 45) return '😐 neutral';
+  if (rel >= 25) return '😕 unconvinced';
+  return '🙅 cold';
+}
+
 function buildChoiceModal() {
   const ch = S.pendingChoice;
   const { overlay, card } = modalShell();
@@ -1105,7 +1166,7 @@ export function render() {
   renderPanel();
   renderLog();
   const adv = $('#advance');
-  adv.disabled = S.gameOver;
+  adv.disabled = S.gameOver || !!S.auditionScene;
   adv.onclick = () => { advanceWeek(S); act({ ok: true }); };
   renderModals();
 }

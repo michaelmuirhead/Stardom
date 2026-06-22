@@ -32,6 +32,8 @@ export function newGame(playerName, difficultyKey) {
     brandOffers: [],     // available brand-deal offers
     genres: Object.fromEntries(GENRE_KEYS.map((k) => [k, 0])), // affinity XP
     contacts: [],        // co-stars & industry relationships
+    directors: [],       // directors you've read for / worked with (they remember you)
+    auditionScene: null, // an in-progress played audition
     partner: null,       // current romantic partner (contact id)
     rivals: [makeRival(START.fame), makeRival(START.fame)], // career-long peers
     pendingChoice: null, // an unresolved narrative dilemma

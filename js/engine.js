@@ -5,7 +5,7 @@ import {
   HALL_OF_FAME, LIFETIME_ACHIEVEMENT_MIN, MILESTONES, CHOICE_EVENTS,
   ASSETS, taxFor, CATEGORIES, fameQuote, STUDIOS, BRANDS,
   AGENT_TIERS, PUBLICIST_FEE, MANAGER_CUT,
-  projectTitle, makeRole, makeCostar, makeRival,
+  projectTitle, makeRole, makeCostar, makeRival, fullName,
 } from './data.js';
 import { pushLog, refreshOffers } from './state.js';
 
@@ -180,58 +180,266 @@ export function auditionChance(s, role) {
 }
 
 export function audition(s, roleId) {
+  const setup = beginAudition(s, roleId);
+  if (!setup.ok) return setup;
+  return finishAudition(s, setup.role, auditionChance(s, setup.role), {});
+}
+
+const AUDITION_ENERGY = 18;
+
+// Shared setup for both the one-shot and the played-scene audition paths.
+function beginAudition(s, roleId) {
   if (s.gameOver) return { ok: false, msg: 'The game is over.' };
   if (isBusy(s)) return { ok: false, msg: 'You are already committed to a project.' };
   const role = s.offers.find((r) => r.id === roleId);
   if (!role) return { ok: false, msg: 'That role is no longer available.' };
-  const energyCost = 18;
-  if (s.energy < energyCost) return { ok: false, msg: 'Too exhausted to audition. Rest first.' };
-
-  spendEnergy(s, energyCost);
+  if (s.energy < AUDITION_ENERGY) return { ok: false, msg: 'Too exhausted to audition. Rest first.' };
+  spendEnergy(s, AUDITION_ENERGY);
   s.stats.auditions++;
-  const chance = auditionChance(s, role);
-  const roll = Math.random();
-  const won = roll < chance;
+  return { ok: true, role };
+}
 
-  // You always learn from being in the room — even when you don't book it.
-  const learn = +rf(0.15, 0.5).toFixed(2);
+// Decide and apply the outcome of an audition at a given (already-modified) chance.
+function finishAudition(s, role, finalChance, info = {}) {
+  finalChance = clamp(finalChance, 0.02, 0.98);
+  const roll = Math.random();
+  const won = roll < finalChance;
+
+  // You always learn from being in the room — a played scene teaches more.
+  const learn = +(info.learn != null ? info.learn : rf(0.15, 0.5)).toFixed(2);
   s.acting = clamp(+(s.acting + learn).toFixed(1), 0, 100);
-  awardGenreXp(s, role.genre, 0.4);
+  awardGenreXp(s, role.genre, info.scene ? 0.7 : 0.4);
+  const dirTag = info.director ? ` (dir. ${info.director.name})` : '';
 
   if (won) {
-    s.offers = s.offers.filter((r) => r.id !== roleId);
+    s.offers = s.offers.filter((r) => r.id !== role.id);
     s.stats.landed++;
+    if (info.director) info.director.films++;
     const costars = castCostars(s);
     const names = costars.map((c) => c.name).join(' & ');
     if (role.category === 'tvshow') {
       startSeries(s, role, costars);
-      pushLog(s, `✅ You're a series regular on "${role.title}" (${role.genreName}) alongside ${names}! Season 1 begins.`);
-      return { ok: true, won: true, msg: `You joined the cast of "${role.title}"!` };
+      if (info.director) s.activeSeries.director = info.director;
+      pushLog(s, `✅ You're a series regular on "${role.title}" (${role.genreName})${dirTag} alongside ${names}! Season 1 begins.`);
+      return { ok: true, won: true, learn, msg: `You joined the cast of "${role.title}"!` };
     }
-    s.active = { role, weeksLeft: role.weeks, totalWeeks: role.weeks, costars };
-    pushLog(s, `✅ You landed ${role.part} in "${role.title}" (${role.genreName} ${role.catName}) with ${names}! Filming starts now.`);
-    return { ok: true, won: true, msg: `You got the part in "${role.title}"!` };
+    s.active = { role, weeksLeft: role.weeks, totalWeeks: role.weeks, costars, director: info.director || null };
+    pushLog(s, `✅ You landed ${role.part} in "${role.title}" (${role.genreName} ${role.catName})${dirTag} with ${names}! Filming starts now.`);
+    return { ok: true, won: true, learn, msg: `You got the part in "${role.title}"!` };
   }
 
   // Near-miss → callback: the offer stays, with better odds next time.
-  const margin = roll - chance; // how far you missed (smaller = closer)
+  const margin = roll - finalChance; // how far you missed (smaller = closer)
   if (!role.callback && margin < 0.15) {
     role.callback = true;
     pushLog(s, `📞 Callback! "${role.title}" wants to see you again — your odds improve. (+${learn} acting from the room)`);
-    return { ok: true, won: false, callback: true, msg: `Callback for "${role.title}"!` };
+    return { ok: true, won: false, callback: true, learn, msg: `Callback for "${role.title}"!` };
   }
 
   // Otherwise you've used your shot. Sometimes a rival snags the part.
-  s.offers = s.offers.filter((r) => r.id !== roleId);
+  s.offers = s.offers.filter((r) => r.id !== role.id);
   const rival = Math.random() < 0.4 ? pickRival(s) : null;
   if (rival) {
     rival.rivalry = clamp(rival.rivalry + rf(2, 6), 0, 100);
     rival.fame = Math.round(clamp(rival.fame + rf(0.3, 1), 1, 100));
     pushLog(s, `❌ You lost "${role.title}" — your rival ${rival.name} landed it instead. (+${learn} acting)`);
-    return { ok: true, won: false, msg: `${rival.name} got the part on "${role.title}".` };
+    return { ok: true, won: false, learn, msg: `${rival.name} got the part on "${role.title}".` };
   }
-  pushLog(s, `❌ You auditioned for "${role.title}" but didn't get it. (${Math.round(chance * 100)}% odds, +${learn} acting)`);
-  return { ok: true, won: false, msg: `No luck on "${role.title}".` };
+  pushLog(s, `❌ You auditioned for "${role.title}" but didn't get it. (${Math.round(finalChance * 100)}% odds, +${learn} acting)`);
+  return { ok: true, won: false, learn, msg: `No luck on "${role.title}".` };
+}
+
+// ---- Played audition scenes -----------------------------------------------
+// An audition is a short scene you act through, not a dice roll. Each beat is a
+// real choice — how to play it, whether to take the director's note, how to
+// close — checked against your craft. Your choices build (or blow) a
+// performance score that shifts your odds, and shape your bond with the
+// director, who remembers you for future projects.
+
+// A director's redirect — the note they throw at you mid-read.
+const DIRECTOR_NOTES = [
+  { line: '“Good — now give me half that. Strip it right back.”', want: 'subtle' },
+  { line: '“I need more. Blow the roof off. Scare me.”', want: 'big' },
+  { line: '“Try it like the whole thing is a joke you’re not telling.”', want: 'offbeat' },
+  { line: '“Slower. Let the silence do the work.”', want: 'subtle' },
+  { line: '“Now do it like your life depends on this scene.”', want: 'big' },
+];
+
+// Roll a single performance beat against the role's bar (+variance).
+// Returns pts in roughly [floor, reward] and a tier label.
+function actBeat(s, role, stat, { reward = 3, variance = 1.6, floor = -2.5 } = {}) {
+  const skill = (stat && s[stat] != null) ? s[stat] : s.acting;
+  const margin = (skill - (role.skillReq || 25)) / 22;     // ~ -1.5 .. +2
+  const roll = margin + rf(-variance, variance);
+  const pts = +clamp(roll * (reward / 2), floor, reward).toFixed(2);
+  const tier = pts > reward * 0.45 ? 'strong' : pts < 0 ? 'flub' : 'ok';
+  return { pts, tier };
+}
+
+const SCENE_LINES = {
+  strong: ['The room goes still.', 'You feel it land.', 'A flicker of a smile from the table.', 'That was real.'],
+  ok: ['Solid. Professional.', 'It plays. Nothing wasted.', 'A competent read.', 'You hit your marks.'],
+  flub: ['It rings false and you know it.', 'You push too hard; it tips over.', 'The energy dies in your hands.', 'Not your best take.'],
+};
+const sLine = (tier) => SCENE_LINES[tier][Math.floor(Math.random() * SCENE_LINES[tier].length)];
+
+// The three beats of a played audition. Each choice returns { line, tier }.
+const AUDITION_BEATS = [
+  {
+    title: 'The read',
+    speak: (sc) => `${sc.director.name} slides the sides across. “Whenever you’re ready.”`,
+    choices: [
+      { key: 'bold', label: '🔥 Go big — a raw, risky swing', stat: 'acting',
+        opts: { reward: 5, variance: 2.4, floor: -4 }, rapport: 0 },
+      { key: 'true', label: '🎯 Play it grounded and true', stat: 'acting',
+        opts: { reward: 3, variance: 1.1, floor: -1.5 }, rapport: 0 },
+      { key: 'method', label: '🧠 Disappear into it (method) — 6⚡', stat: 'acting',
+        opts: { reward: 4.5, variance: 1.6, floor: -2 }, rapport: 0, energy: 6, healthGate: true },
+      { key: 'ask', label: '💬 Ask about her backstory first', stat: 'acting',
+        opts: { reward: 2, variance: 0.9, floor: -0.5 }, rapport: 6 },
+    ],
+  },
+  {
+    title: 'The redirect',
+    speak: (sc) => `${sc.director.name}: ${sc.note.line}`,
+    choices: [
+      { key: 'take', label: '↩️ Take the note — adjust on the spot', stat: 'acting',
+        opts: { reward: 4, variance: 1.4, floor: -2 }, rapport: 5, rep: 0.4 },
+      { key: 'commit', label: '✊ Commit to your read', stat: 'acting',
+        opts: { reward: 5, variance: 2.2, floor: -4 }, rapport: 2, conviction: true },
+      { key: 'blend', label: '🤝 Split the difference', stat: 'acting',
+        opts: { reward: 2.5, variance: 1.0, floor: -1 }, rapport: 1 },
+    ],
+  },
+  {
+    title: 'The close',
+    speak: () => 'They thank you. There’s a beat — the room is yours for one more move.',
+    choices: [
+      { key: 'chem', label: '💞 Push for a chemistry read with the lead', stat: 'acting',
+        opts: { reward: 4, variance: 2.0, floor: -3 }, rapport: 3, fameGate: true },
+      { key: 'chat', label: '🥂 Linger and build rapport', stat: 'acting',
+        opts: { reward: 1.2, variance: 0.7, floor: 0 }, rapport: 8 },
+      { key: 'leave', label: '🚪 Nail it and leave them wanting', stat: 'acting',
+        opts: { reward: 2.5, variance: 1.2, floor: -1 }, rapport: 2, conviction: true },
+    ],
+  },
+];
+
+function getOrCreateDirector(s, role) {
+  if (!s.directors) s.directors = [];
+  // Lean on a director who likes you — recurring collaborators build a career.
+  const fans = s.directors.filter((d) => d.rel >= 60);
+  if (fans.length && Math.random() < 0.5) return fans[Math.floor(Math.random() * fans.length)];
+  if (s.directors.length && Math.random() < 0.25) return s.directors[Math.floor(Math.random() * s.directors.length)];
+  const d = { id: 'dir' + Math.random().toString(36).slice(2, 8), name: fullName(), rel: 50, films: 0 };
+  s.directors.push(d);
+  if (s.directors.length > 24) s.directors.shift();
+  return d;
+}
+
+function bumpDirector(s, d, amt) {
+  if (!d) return;
+  d.rel = clamp(Math.round(d.rel + amt), 0, 100);
+}
+
+export function startAudition(s, roleId) {
+  const setup = beginAudition(s, roleId);
+  if (!setup.ok) return setup;
+  const role = setup.role;
+  s.auditionScene = {
+    roleId,
+    role,
+    director: getOrCreateDirector(s, role),
+    note: DIRECTOR_NOTES[Math.floor(Math.random() * DIRECTOR_NOTES.length)],
+    beat: 0,
+    perf: 0,
+    rapport: 0,
+    baseChance: auditionChance(s, role),
+    chosen: [],
+    done: false,
+  };
+  return { ok: true, scene: true };
+}
+
+export function auditionChoose(s, choiceKey) {
+  const sc = s.auditionScene;
+  if (!sc || sc.done) return { ok: false, msg: 'No audition in progress.' };
+  const beat = AUDITION_BEATS[sc.beat];
+  const choice = beat.choices.find((c) => c.key === choiceKey);
+  if (!choice) return { ok: false, msg: 'Invalid choice.' };
+  if (choice.energy && s.energy < choice.energy) return { ok: false, msg: 'Too drained for that approach.' };
+  if (choice.energy) spendEnergy(s, choice.energy);
+
+  const r = actBeat(s, sc.role, choice.stat, choice.opts);
+  let pts = r.pts;
+  let rapport = choice.rapport || 0;
+
+  // Conviction pays off when your craft backs it up, and stings when it doesn't.
+  if (choice.conviction) pts += (s.acting >= sc.role.skillReq ? 1.2 : -1.6);
+  // Method rewards being rested & healthy; exhaustion makes it self-indulgent.
+  if (choice.healthGate) pts += ((s.health ?? 100) >= 60 ? 0.8 : -1.2);
+  // A chemistry read only flatters you if you've got the wattage to carry it.
+  if (choice.fameGate) { pts += (s.fame >= 35 ? 0.8 : -1.0); rapport += s.fame >= 35 ? 2 : 0; }
+  // Taking the note well reads as professionalism.
+  if (choice.rep) s.reputation = clamp(+(s.reputation + choice.rep).toFixed(1), 0, 100);
+  // Matching the director's specific note lands harder.
+  if (sc.note && choice.key === 'take') rapport += 2;
+
+  sc.perf += pts;
+  sc.rapport += rapport;
+  sc.chosen.push({ q: beat.title, a: choice.label.replace(/\s*—.*$/, ''), line: sLine(r.tier), tier: r.tier });
+
+  sc.beat++;
+  if (sc.beat >= AUDITION_BEATS.length) return resolveScene(s);
+  return { ok: true, scene: true };
+}
+
+function resolveScene(s) {
+  const sc = s.auditionScene;
+  const role = sc.role;
+  // Performance shifts the odds within a meaningful band around your base shot.
+  const mod = +clamp(sc.perf * 0.045, -0.3, 0.34).toFixed(3);
+  const finalChance = sc.baseChance + mod;
+  bumpDirector(s, sc.director, Math.round(sc.rapport * 0.5 + (mod > 0 ? 3 : -1)));
+  const res = finishAudition(s, role, finalChance, {
+    learn: rf(0.35, 0.75), director: sc.director, scene: true,
+  });
+  sc.done = true;
+  sc.verdict = {
+    won: res.won,
+    callback: !!res.callback,
+    msg: res.msg,
+    mod,
+    finalChance: clamp(finalChance, 0.02, 0.98),
+    perf: sc.perf,
+    director: sc.director,
+    learn: res.learn,
+  };
+  return { ok: true, scene: true, sceneDone: true, won: res.won };
+}
+
+// Dismiss the resolved audition scene (UI calls this on Continue).
+export function closeAudition(s) {
+  s.auditionScene = null;
+  return { ok: true };
+}
+
+// Beat content for the UI to render the current scene.
+export function currentAuditionBeat(s) {
+  const sc = s.auditionScene;
+  if (!sc || sc.done) return null;
+  const beat = AUDITION_BEATS[sc.beat];
+  return {
+    index: sc.beat,
+    total: AUDITION_BEATS.length,
+    title: beat.title,
+    speak: beat.speak(sc),
+    choices: beat.choices.map((c) => ({
+      key: c.key,
+      label: c.label,
+      disabled: (c.energy && s.energy < c.energy) || false,
+    })),
+  };
 }
 
 // ---- Negotiation -----------------------------------------------------------
@@ -289,7 +497,7 @@ function updateRivals(s) {
 
 // ---- Narrative dilemmas ----------------------------------------------------
 function maybeTriggerChoice(s) {
-  if (s.pendingChoice || s.ceremonyNight || s.releaseNight || s.gameOver) return;
+  if (s.pendingChoice || s.ceremonyNight || s.releaseNight || s.auditionScene || s.gameOver) return;
   if (Math.random() >= 0.06) return; // ~6%/week
   const eligible = CHOICE_EVENTS.filter((e) => !e.when || e.when(s));
   if (!eligible.length) return;
@@ -1471,7 +1679,7 @@ export function retire(s) {
 
 // ---- Advance one week ------------------------------------------------------
 export function advanceWeek(s) {
-  if (s.gameOver) return;
+  if (s.gameOver || s.auditionScene) return;
 
   const D = diffOf(s);
 
