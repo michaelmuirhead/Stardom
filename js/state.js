@@ -37,8 +37,10 @@ export function newGame(playerName, difficultyKey) {
     pendingChoice: null, // an unresolved narrative dilemma
 
     careerPrestige: 0,   // cumulative prestige across your whole career
+    history: [],         // yearly snapshots for the career graph
     assets: [],          // owned lifestyle assets (keys)
     royalties: [],       // decaying residual income from past hits
+    franchises: [],      // hit films that can spawn sequels
     yearIncome: 0,       // gross income this year (for taxes)
     taxWithheld: 0,      // tax withheld so far this year
     milestonesDone: {},  // milestone key -> year completed
@@ -47,6 +49,7 @@ export function newGame(playerName, difficultyKey) {
     log: [],
   };
   s.money = diff.startMoney;
+  s.history = [{ year: 1, age: s.age, fame: Math.round(s.fame), money: s.money, acting: Math.round(s.acting) }];
   refreshOffers(s);
   pushLog(s, `🎬 ${s.name} arrives in town with $${s.money} and a dream. (${diff.name} mode)`);
   return s;

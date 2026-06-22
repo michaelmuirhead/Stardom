@@ -883,7 +883,8 @@ function wrapStudioProject(s, a) {
   const quality = clamp(Math.round(base * rf(0.8, 1.15)), 5, 100);
   const rec = reception(quality);
   const sc = scoreRelease(quality, s.fame, a.role.prestige);
-  const result = projectResult('Studio Film', 2, sc.audience, s.fame);
+  const comp = releaseCompetition(s);
+  const result = applyCompetition(projectResult('Studio Film', 2, sc.audience, s.fame), comp);
   bondWithCostars(s, a.costars || []);
   const fameGain = +(a.role.fameGain * rec.fameMult).toFixed(1);
   gainFame(s, fameGain);
@@ -902,11 +903,13 @@ function wrapStudioProject(s, a) {
     critics: sc.critics, audience: sc.audience,
   });
   grantRoyalty(s, a.role.title, result, at.star ? 'lead' : 'supporting');
+  maybeStartFranchise(s, { title: a.role.title, genre: a.role.genre, genreName: a.role.genreName, genreIcon: a.role.genreIcon, category: 'Studio Film', quality });
   pushLog(s, `🎞️ Your film "${a.role.title}" released — ${rec.emoji} ${rec.label} (🍅 ${sc.critics} / 🍿 ${sc.audience}). +${fameGain} fame.`);
   s.releaseNight = {
     title: a.role.title, icon: a.role.genreIcon, category: 'Your Studio Film', role: roles,
     genre: a.role.genreName, quality, reception: rec.label, emoji: rec.emoji,
     critics: sc.critics, audience: sc.audience,
+    competition: comp && comp.factor < 1 ? comp.rival : null,
     result, fameGain, costars: (a.costars || []).map((c) => c.name),
   };
   s.active = null;
@@ -1035,6 +1038,113 @@ function projectResult(category, tier, quality, fame) {
   return { type: 'views', value: +(baseV * tierMult * (0.4 + quality / 100 * 1.8) * draw * lk).toFixed(1) };
 }
 
+// ---- Franchises & the release calendar ------------------------------------
+// A breakout film can spawn a franchise: a later sequel offer that pays a
+// premium and carries a built-in audience — but deepens your typecast and
+// fatigues with each installment.
+const sequelTitle = (base, n) => `${base.replace(/\s+\d+$/, '')} ${n}`;
+
+// Films can franchise; episodic TV / commercials / theatre don't.
+function franchiseable(category) {
+  return ['Indie Film', 'Studio Film', 'Streaming Film', 'Produced', 'Movie', 'Documentary'].includes(category);
+}
+
+function maybeStartFranchise(s, info) {
+  if (!s.franchises) s.franchises = [];
+  if (!franchiseable(info.category)) return;
+  if (info.quality < 72) return;                          // only true breakouts
+  if (s.franchises.length >= 6) return;
+  if (s.franchises.some((f) => f.baseTitle === info.title)) return;
+  s.franchises.push({
+    baseTitle: info.title,
+    genre: info.genre,
+    genreName: info.genreName,
+    genreIcon: info.genreIcon || '🎬',
+    installments: 1,
+    strength: Math.round(info.quality),                   // erodes with sequels
+    cooldown: Math.round(rf(18, 42)),                     // weeks until a sequel
+  });
+  pushLog(s, `🌟 "${info.title}" is a phenomenon — the studio smells a franchise.`);
+}
+
+// Build a sequel audition offer for an established franchise.
+function makeSequelRole(s, fr) {
+  const next = fr.installments + 1;
+  const role = makeRole(s.fame, false);
+  role.category = 'movie';
+  role.catName = (CATEGORIES.movie && CATEGORIES.movie.name) || 'Movie';
+  role.icon = (CATEGORIES.movie && CATEGORIES.movie.icon) || '🎬';
+  role.title = sequelTitle(fr.baseTitle, next);
+  role.genre = fr.genre;
+  role.genreName = fr.genreName;
+  role.genreIcon = fr.genreIcon;
+  role.billing = 'lead';
+  role.part = 'Returning Lead';
+  role.openCall = false;
+  role.tier = 2;
+  // Sequels pay a premium and bring built-in fame, but break less new ground.
+  role.pay = Math.round(role.pay * (1.6 + next * 0.25));
+  role.fameGain = +(role.fameGain * 1.3).toFixed(1);
+  role.prestige = +(role.prestige * 0.7).toFixed(2);
+  role.fameReq = Math.max(0, role.fameReq - 10);          // they want YOU back
+  role.sequel = true;
+  role.franchiseBase = fr.baseTitle;
+  return role;
+}
+
+// Once per week, a dormant franchise may resurface with a sequel offer.
+function maybeOfferSequel(s) {
+  if (!s.franchises || !s.franchises.length) return;
+  if (isBusy(s) || !s.hasAgent) return;
+  for (const fr of s.franchises) {
+    if (fr.cooldown > 0) { fr.cooldown--; continue; }
+    if (fr.installments >= 4) continue;                   // franchises fatigue out
+    if (s.offers.some((o) => o.franchiseBase === fr.baseTitle)) continue;
+    if (Math.random() < 0.14) {
+      s.offers.unshift(makeSequelRole(s, fr));
+      pushLog(s, `📣 The studio wants you back for "${sequelTitle(fr.baseTitle, fr.installments + 1)}".`);
+    }
+  }
+}
+
+// Wrapping a sequel advances (or retires) its franchise.
+function advanceFranchise(s, baseTitle, quality) {
+  const fr = (s.franchises || []).find((f) => f.baseTitle === baseTitle);
+  if (!fr) return;
+  fr.installments++;
+  fr.strength = Math.round((fr.strength + quality) / 2 - 5); // diminishing returns
+  fr.cooldown = Math.round(rf(24, 52));
+  awardGenreXp(s, fr.genre, 2);                            // returning role = typecast
+  if (fr.installments >= 4 || fr.strength < 55) {
+    pushLog(s, `🎬 The "${fr.baseTitle}" franchise has run its course.`);
+    s.franchises = s.franchises.filter((f) => f !== fr);
+  }
+}
+
+// Hit or advance the right franchise when a film wraps.
+function tickFranchise(s, role, quality) {
+  if (role.sequel && role.franchiseBase) advanceFranchise(s, role.franchiseBase, quality);
+  else maybeStartFranchise(s, { title: role.title, genre: role.genre, genreName: role.genreName, genreIcon: role.genreIcon, category: role.catName, quality });
+}
+
+// Release calendar: opening against a rival blockbuster can cut box office.
+function releaseCompetition(s) {
+  if (Math.random() < 0.3) {
+    const pool = (s.rivals || []).filter((r) => r && r.name);
+    const rival = pool.length ? pool[Math.floor(Math.random() * pool.length)].name : 'a major studio tentpole';
+    return { factor: +rf(0.55, 0.82).toFixed(2), rival };
+  }
+  return { factor: 1, rival: null };
+}
+
+// Apply a competition factor to a box-office result in place; views unaffected.
+function applyCompetition(result, comp) {
+  if (result && comp && comp.factor < 1 && result.type === 'box') {
+    result.value = Math.round(result.value * comp.factor);
+  }
+  return result;
+}
+
 // Rehearse for the project you're currently filming to lift its performance.
 export function prepareRole(s) {
   if (s.gameOver) return { ok: false, msg: 'The game is over.' };
@@ -1060,7 +1170,8 @@ function wrapProduction(s, prod) {
   const q = clamp(base * rf(0.6, 1.25), 5, 100);
 
   // Box office return scales with budget tier & quality.
-  const gross = Math.round(prod.cost * (0.4 + (q / 100) * 2.4) * rf(0.7, 1.3));
+  const comp = releaseCompetition(s);
+  const gross = Math.round(prod.cost * (0.4 + (q / 100) * 2.4) * rf(0.7, 1.3) * comp.factor);
   const profit = gross - prod.cost;
   earn(s, gross);
   const fameGain = +(q / 100 * 6 * Math.sqrt(prod.scale)).toFixed(1);
@@ -1090,6 +1201,7 @@ function wrapProduction(s, prod) {
     reception: rec.label, result: { type: 'box', value: gross },
   });
 
+  maybeStartFranchise(s, { title: prod.title, genre: prod.genre, genreName: prod.genreName, genreIcon: prod.genreIcon, category: 'Produced', quality: q });
   const verdict = profit > 0
     ? `It grossed $${gross.toLocaleString()} — a $${profit.toLocaleString()} profit! 🍾`
     : `It grossed $${gross.toLocaleString()} — a $${Math.abs(profit).toLocaleString()} loss. 📉`;
@@ -1099,6 +1211,7 @@ function wrapProduction(s, prod) {
     role: [prod.star ? 'Star' : null, prod.directed ? 'Director' : null, 'Producer'].filter(Boolean).join(' / '),
     genre: prod.genreName, quality: Math.round(q), reception: rec.label, emoji: rec.emoji,
     critics: sc.critics, audience: sc.audience,
+    competition: comp && comp.factor < 1 ? comp.rival : null,
     result: { type: 'box', value: gross }, profit, fameGain,
     costars: (prod.costars || []).map((c) => c.name),
   };
@@ -1394,18 +1507,24 @@ export function advanceWeek(s) {
       s.reputation = clamp(s.reputation + a.role.prestige * 2 + (rec ? rec.rep : 0), 0, 100);
       s.careerPrestige += a.role.prestige;
       awardGenreXp(s, a.role.genre, 1.5 + a.role.prestige);
+      const comp = isAd ? null : releaseCompetition(s);
+      const result = isAd ? null : applyCompetition(projectResult(a.role.catName, a.role.tier, sc.audience, s.fame), comp);
       addCredit(s, {
         title: a.role.title, category: a.role.catName,
         role: a.role.part, genre: a.role.genreName,
         acted: true, billing: a.role.billing || 'supporting',
         lead: a.role.billing === 'lead',
+        sequel: !!a.role.sequel,
         costars: (a.costars || []).map((c) => c.id),
         quality, reception: rec ? rec.label : undefined,
         critics: sc ? sc.critics : undefined, audience: sc ? sc.audience : undefined,
-        result: isAd ? null : projectResult(a.role.catName, a.role.tier, sc.audience, s.fame),
+        result,
       });
       const cred = s.filmography[s.filmography.length - 1];
-      if (!isAd) grantRoyalty(s, a.role.title, cred.result, a.role.billing);
+      if (!isAd) {
+        grantRoyalty(s, a.role.title, cred.result, a.role.billing);
+        tickFranchise(s, a.role, quality);
+      }
       const recMsg = rec ? ` ${rec.emoji} ${rec.label} (🍅 ${sc.critics} / 🍿 ${sc.audience}).` : '';
       pushLog(s, `🎉 "${a.role.title}" wrapped!${recMsg} +${fameGain} fame, +${a.role.skillGain} acting.`);
       if (!isAd) {
@@ -1414,6 +1533,7 @@ export function advanceWeek(s) {
           role: a.role.part, billing: a.role.billing, genre: a.role.genreName,
           quality, reception: rec.label, emoji: rec.emoji, result: cred.result,
           critics: sc.critics, audience: sc.audience,
+          competition: comp && comp.factor < 1 ? comp.rival : null,
           fameGain, costars: (a.costars || []).map((c) => c.name),
         };
       }
@@ -1453,6 +1573,9 @@ export function advanceWeek(s) {
   // Slowly refresh the audition board so it stays lively
   if (Math.random() < 0.5 && !isBusy(s)) refreshOffers(s);
 
+  // A dormant franchise may resurface with a sequel offer.
+  maybeOfferSequel(s);
+
   // Advance the calendar
   s.week++;
   if (s.week > WEEKS_PER_YEAR) {
@@ -1476,6 +1599,9 @@ export function advanceWeek(s) {
     const decay = clamp((s.age - 40) * 0.1, 0, 4) * (activeRecently ? 0.3 : 1.4);
     if (decay > 0) s.fame = clamp(+(s.fame - decay).toFixed(1), 0, 100);
     if (s.age >= 45) s.health = clamp((s.health ?? 100) - rf(0.5, 2), 0, 100);
+    if (!s.history) s.history = [];
+    s.history.push({ year: s.year, age: s.age, fame: Math.round(s.fame), money: Math.round(s.money), acting: Math.round(s.acting) });
+    if (s.history.length > 80) s.history.shift();
     pushLog(s, `📅 A new year begins. You are now ${s.age}.${decay > 1.5 && !activeRecently ? ' The spotlight is drifting away…' : ''}`);
   }
 

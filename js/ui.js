@@ -272,6 +272,7 @@ function roleCard(r) {
   const chCls = chance >= 60 ? 'good' : chance >= 30 ? 'mid' : 'bad';
   const c = el('div', 'card' + (r.callback ? ' callback' : ''));
   c.innerHTML = `
+    ${r.sequel ? '<div class="badge sequel">🎬 Franchise sequel — they want you back</div>' : ''}
     ${r.callback ? '<div class="badge">📞 Callback — they liked you</div>' : ''}
     <div class="card-head"><span class="card-ic">${r.icon}</span>
       <div><div class="card-title">${r.title} <span class="bill bill-${r.billing || 'supporting'}">${(BILLING[r.billing] || BILLING.supporting).label}</span></div>
@@ -751,6 +752,8 @@ function careerView() {
     <span>Classes: ${S.stats.classes}</span>`;
   wrap.appendChild(meta);
 
+  wrap.appendChild(careerGraph());
+  wrap.appendChild(franchiseBlock());
   wrap.appendChild(awardsSection());
 
   // Filmography
@@ -776,6 +779,51 @@ function careerView() {
     if (window.confirm('Retire for good? This ends your career and shows your final legacy.')) act(retire(S));
   }));
   wrap.appendChild(retireBlock);
+  return wrap;
+}
+
+// ---- Career trajectory graph -----------------------------------------------
+function careerGraph() {
+  const wrap = el('div');
+  wrap.appendChild(el('h3', null, '📈 Career Trajectory'));
+  const h = S.history || [];
+  if (h.length < 2) {
+    wrap.appendChild(el('p', 'muted', 'Play a few years to chart your fame and fortune over time.'));
+    return wrap;
+  }
+  const W = 320, H = 120, padL = 4, padR = 4, padT = 6, padB = 14;
+  const n = h.length;
+  const xs = (i) => padL + (i / (n - 1)) * (W - padL - padR);
+  const maxMoney = Math.max(1, ...h.map((p) => Math.abs(p.money)));
+  const yFame = (v) => padT + (1 - v / 100) * (H - padT - padB);
+  const yMoney = (v) => padT + (1 - v / maxMoney) * (H - padT - padB);
+  const line = (sel, color, w) => `<polyline fill="none" stroke="${color}" stroke-width="${w}" points="${h.map((p, i) => `${xs(i).toFixed(1)},${sel(p).toFixed(1)}`).join(' ')}" />`;
+  const last = h[h.length - 1];
+  const svg = `<svg viewBox="0 0 ${W} ${H}" class="career-graph" preserveAspectRatio="none" role="img" aria-label="Career trajectory">
+    ${line((p) => yMoney(Math.abs(p.money)), 'var(--accent)', 2)}
+    ${line((p) => yFame(p.fame), 'var(--gold)', 2)}
+  </svg>`;
+  const box = el('div', 'graph-box');
+  box.innerHTML = svg;
+  wrap.appendChild(box);
+  wrap.appendChild(el('div', 'graph-legend muted small',
+    `<span><span class="dot gold"></span>Fame (${last.fame})</span> <span><span class="dot accent"></span>Net worth (${bigMoney(last.money)})</span> <span class="muted">· Yr 1–${last.year}</span>`));
+  return wrap;
+}
+
+// ---- Active franchises -----------------------------------------------------
+function franchiseBlock() {
+  const wrap = el('div');
+  const fr = S.franchises || [];
+  if (!fr.length) return wrap;
+  wrap.appendChild(el('h3', null, `🎬 Franchises (${fr.length})`));
+  const ul = el('ul', 'list');
+  for (const f of fr) {
+    const status = f.installments >= 4 ? 'concluded' : f.cooldown > 0 ? `next sequel in ~${f.cooldown} wk` : 'sequel ready';
+    ul.appendChild(el('li', null,
+      `<b>${f.baseTitle}</b> <span class="muted">· ${f.genreIcon} ${f.genreName} · ${f.installments} film${f.installments > 1 ? 's' : ''} · strength ${f.strength}</span> <span class="muted small">— ${status}</span>`));
+  }
+  wrap.appendChild(ul);
   return wrap;
 }
 
@@ -927,6 +975,10 @@ function buildReleaseModal() {
   if (r.fameGain != null) html += row('Fame gained', `+${r.fameGain}`);
   rows.innerHTML = html;
   card.appendChild(rows);
+
+  if (r.competition) {
+    card.appendChild(el('p', 'bad small', `🥊 Opened against ${r.competition}'s blockbuster — box office took a hit.`));
+  }
 
   card.appendChild(el('p', `modal-headline ${/Hit|Smash/.test(r.reception) ? 'good' : ''}`,
     `${r.emoji} ${r.reception}${r.verdict ? ' — ' + r.verdict : '!'}`));

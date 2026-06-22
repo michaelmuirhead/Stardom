@@ -190,6 +190,52 @@ honored project celebrate with you, deepening those relationships. **Best Origin
 open to films you write — both screenplays you sell to studios and your own
 self-produced projects.
 
+## The long game
+
+A career plays out over decades, and these systems shape its full arc:
+
+**Aging & the career arc.** Every year you get older, and age changes the game.
+Your career moves through phases — **Rising → In Their Prime → Veteran → Elder
+Statesman** — shown on the Career page. Past 50 your **stamina** tapers (lower
+max energy), leading roles get harder to land once you're past 45 (unless you're
+a huge star), and if you go quiet your **fame fades** faster the older you are.
+Staying relevant late means choosing your projects well.
+
+**Health & wellness.** A new **❤️ Health** stat (0–100) governs how fast your
+energy recovers — run yourself ragged (chronically low energy) and your health
+erodes, which slows recovery further and dents your audition odds. Spend on a
+**🧘 Wellness** retreat to restore health and energy. Health also declines slowly
+with age, so veterans have to manage it.
+
+**Agent, manager & publicist tiers.** Representation is now a real ladder. Sign
+with an agent tier — **Boutique → Established → Powerhouse** — each unlocking more
+(and better) offers and bigger audition pull, for a steeper cut. Add a **manager**
+(small cut, sharpens negotiations) and a **publicist** (weekly retainer that
+softens scandals and amplifies good press). Manage all of it on the **People** tab.
+
+**Endorsements & social media.** Build a **fanbase**: 📣 **post on social** to
+grow followers (with a chance to go viral), and once you're known, **brand deals**
+roll in — recurring endorsement income on the new **Press** tab. Followers drift
+toward your fame over time, and overexposure can nick your reputation.
+
+**Franchises & a release calendar.** A breakout film (a true smash) can become a
+**franchise**: months later the studio offers you a **sequel** — premium pay and
+built-in audience, flagged on the casting board — at the cost of deepening your
+typecast. Franchises fatigue with each installment and eventually run their
+course (tracked on the Career page). And no film opens in a vacuum: releasing
+**against a rival blockbuster** can take a bite out of your box office, shown on
+the premiere screen.
+
+**Festivals & critic-vs-audience scores.** Every release now gets a **🍅 Critics**
+and **🍿 Audience** score (critics reward craft and prestige; audiences reward
+broad appeal and star power). Four real **film festivals** — Sundance, Cannes,
+Venice, TIFF — anoint your recent acclaimed work through the year, boosting
+prestige, reputation, and fame.
+
+**Career stats & graphs.** The Career page charts your **fame and net worth over
+time** on a trajectory graph, alongside lifetime box office, total viewership,
+career prestige, and your full filmography with every score.
+
 ## Retirement & the Hall of Fame
 
 Careers don't run forever. From the **Career** tab you can **retire** at any time
